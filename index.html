@@ -24,15 +24,8 @@
   --warn: #9a6a00;
   --warn-soft: #fbf1d9;
   --font-body: "Be Vietnam Pro", system-ui, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light; /* always light, regardless of the viewer's theme */
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #101615; --surface: #172020; --ink: #e4ecea; --muted: #93a3a0; --line: #2a3634;
-  --accent: #4fc2b4; --accent-soft: #1b3330; --up: #5fcf86; --down: #f08a72; --warn: #e2b44c; --warn-soft: #2e2716;
-  color-scheme: dark } }
-:root[data-theme="dark"] {
-  --bg: #101615; --surface: #172020; --ink: #e4ecea; --muted: #93a3a0; --line: #2a3634;
-  --accent: #4fc2b4; --accent-soft: #1b3330; --up: #5fcf86; --down: #f08a72; --warn: #e2b44c; --warn-soft: #2e2716;
-  color-scheme: dark }
 
 * { box-sizing: border-box; }
 body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.5; }
