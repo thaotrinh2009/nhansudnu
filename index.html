@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>[hidden]{display:none!important}html,body{height:100%}body{margin:0}img{max-width:100%}</style>
+</head>
+<body>
+<title>Biến động nhân sự tháng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one working column — upload strip, month bar, tabbed report table. */
+:root {
+  --bg: #f4f6f6;
+  --surface: #ffffff;
+  --ink: #15201f;
+  --muted: #5d6b69;
+  --line: #dde3e2;
+  --accent: #0f6b62;
+  --accent-soft: #e2f0ee;
+  --up: #1d7a3e;
+  --down: #b2402b;
+  --warn: #9a6a00;
+  --warn-soft: #fbf1d9;
+  --font-body: "Be Vietnam Pro", system-ui, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #101615; --surface: #172020; --ink: #e4ecea; --muted: #93a3a0; --line: #2a3634;
+  --accent: #4fc2b4; --accent-soft: #1b3330; --up: #5fcf86; --down: #f08a72; --warn: #e2b44c; --warn-soft: #2e2716;
+  color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #101615; --surface: #172020; --ink: #e4ecea; --muted: #93a3a0; --line: #2a3634;
+  --accent: #4fc2b4; --accent-soft: #1b3330; --up: #5fcf86; --down: #f08a72; --warn: #e2b44c; --warn-soft: #2e2716;
+  color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.5; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 28px 20px 60px; display: grid; gap: 20px; }
+h1 { font-size: 22px; font-weight: 700; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.sub { color: var(--muted); margin: 4px 0 0; max-width: 70ch; }
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; }
+
+/* Upload */
+.drop { border: 1.5px dashed var(--line); border-radius: 10px; background: var(--surface); padding: 16px; display: grid; gap: 14px; transition: border-color .15s, background .15s; }
+.drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.drop-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.slot { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 2px; min-width: 0; }
+.slot .name { font-weight: 600; }
+.slot .file { font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.slot.ok { border-color: var(--accent); }
+.slot.ok .file { color: var(--accent); }
+.btn { font: inherit; font-weight: 600; border: 1px solid var(--accent); background: var(--accent); color: var(--surface); padding: 8px 14px; border-radius: 7px; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn:focus-visible, select:focus-visible, input:focus-visible, .tab:focus-visible, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.err { color: var(--down); font-weight: 500; }
+
+/* Month bar */
+.bar { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: end; }
+.field { display: grid; gap: 4px; }
+.field.export { margin-left: auto; }
+@media (max-width: 700px) { .field.export { margin-left: 0; } }
+select, input[type=search] { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px; }
+input[type=search] { min-width: 0; width: 260px; max-width: 100%; }
+
+/* Tabs */
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--line); }
+.tab { font: inherit; background: none; border: none; border-bottom: 2.5px solid transparent; padding: 10px 12px 9px; cursor: pointer; color: var(--muted); font-weight: 600; display: flex; gap: 8px; align-items: center; }
+.tab[aria-selected=true] { color: var(--ink); border-bottom-color: var(--accent); }
+.count { font-variant-numeric: tabular-nums; font-size: 12px; background: var(--accent-soft); color: var(--accent); padding: 1px 8px; border-radius: 99px; }
+
+.panel-head { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; align-items: center; }
+.note { background: var(--warn-soft); color: var(--warn); border-radius: 7px; padding: 8px 12px; font-size: 13px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: inherit; font-size: 12.5px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 4px 10px; border-radius: 99px; cursor: pointer; }
+.chip[aria-pressed=true] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+
+.table-box { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; white-space: nowrap; background: var(--surface); position: sticky; top: 0; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: var(--accent-soft); }
+td.num, th.num { text-align: right; white-space: nowrap; }
+td.date { white-space: nowrap; }
+.mono { font-size: 13px; white-space: nowrap; }
+.who { font-weight: 600; white-space: nowrap; }
+.who small { display: block; font-weight: 400; color: var(--muted); font-size: 12.5px; }
+* { font-family: var(--font-body); }
+.unit { color: var(--muted); font-size: 12.5px; }
+.pill { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line); white-space: nowrap; }
+.pill.ok { border-color: var(--up); color: var(--up); }
+.pill.pending { border-color: var(--warn); color: var(--warn); }
+.up { color: var(--up); font-weight: 600; }
+.down { color: var(--down); font-weight: 600; }
+.dim { color: var(--muted); }
+.empty { padding: 36px 16px; text-align: center; color: var(--muted); }
+.empty strong { color: var(--ink); display: block; margin-bottom: 4px; }
+.gate { min-height: 100%; display: grid; place-items: center; padding: 64px 16px; }
+.gate-card { width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 28px 24px; display: grid; gap: 10px; }
+.gate-card h2 { margin: 0 0 8px; font-size: 19px; font-weight: 700; text-wrap: balance; }
+.gate-card input { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 9px 12px; }
+.gate-card input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.gate-card .btn { margin-top: 6px; padding: 10px 14px; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 8px; font-weight: 500; }
+@media (max-width: 600px) { .wrap { padding: 20px 16px 48px; } h1 { font-size: 19px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="gate" id="gate">
+  <form class="gate-card" id="gateForm" autocomplete="off">
+    <span class="label">Biến động nhân sự</span>
+    <h2>Nhập mật khẩu để mở ứng dụng</h2>
+    <label class="label" for="gatePw">Mật khẩu</label>
+    <input type="password" id="gatePw" autocomplete="current-password" required>
+    <div class="err" id="gateErr" hidden></div>
+    <button class="btn" type="submit">Mở ứng dụng</button>
+  </form>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <header style="display:flex;gap:12px;justify-content:space-between;align-items:start;flex-wrap:wrap">
+    <div style="min-width:0;flex:1">
+    <h1>Biến động nhân sự theo tháng</h1>
+    <p class="sub">Tải lên 3 file xuất từ hệ thống (Hợp đồng, Quyết định thôi việc, Sự nghiệp), chọn tháng để xem ai ký hợp đồng, tăng lương, được bổ nhiệm và nghỉ việc. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.</p>
+    </div>
+    <button class="btn ghost" id="lockBtn" type="button">Khoá ứng dụng</button>
+  </header>
+
+  <section class="drop" id="drop">
+    <div class="drop-head">
+      <span class="label">Dữ liệu nguồn</span>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input type="file" id="fileInput" accept=".xlsx,.xls" multiple hidden>
+        <button class="btn" id="pickBtn" type="button">Chọn file Excel</button>
+        <button class="btn ghost" id="clearBtn" type="button" hidden>Xoá dữ liệu</button>
+      </div>
+    </div>
+    <div class="slots">
+      <div class="slot" id="slot-contract"><span class="name">Hợp đồng</span><span class="file">hop-dong.report…xlsx</span></div>
+      <div class="slot" id="slot-career"><span class="name">Sự nghiệp (quyết định nhân sự)</span><span class="file">su-nghiep.general.report…xlsx</span></div>
+      <div class="slot" id="slot-leave"><span class="name">Quyết định thôi việc</span><span class="file">quyet-dinh-thoi-viec.report…xlsx</span></div>
+    </div>
+    <div class="dim" id="dropHint">Kéo thả cả 3 file vào đây, hoặc bấm “Chọn file Excel” và chọn nhiều file cùng lúc. Hệ thống tự nhận diện file theo tiêu đề cột.</div>
+    <div class="err" id="errBox" hidden></div>
+  </section>
+
+  <section id="report" hidden style="display:grid;gap:16px">
+    <div class="bar">
+      <div class="field">
+        <label class="label" for="monthSel">Tháng báo cáo</label>
+        <select id="monthSel"></select>
+      </div>
+      <div class="field" style="min-width:0">
+        <label class="label" for="q">Tìm nhân sự</label>
+        <input type="search" id="q" placeholder="Tên, mã nhân sự, đơn vị…">
+      </div>
+      <div class="field export">
+        <label class="label" for="exportScope">Xuất Excel (4 bảng)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <select id="exportScope">
+            <option value="month">Tháng đang chọn</option>
+            <option value="all">Tất cả các tháng</option>
+          </select>
+          <button class="btn" id="exportBtn" type="button">Xuất Excel</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="tab-contract" data-tab="contract" aria-selected="true">Ký hợp đồng <span class="count" id="c-contract">0</span></button>
+      <button class="tab" role="tab" id="tab-raise" data-tab="raise" aria-selected="false">Tăng lương <span class="count" id="c-raise">0</span></button>
+      <button class="tab" role="tab" id="tab-appoint" data-tab="appoint" aria-selected="false">Bổ nhiệm <span class="count" id="c-appoint">0</span></button>
+      <button class="tab" role="tab" id="tab-leave" data-tab="leave" aria-selected="false">Nghỉ việc <span class="count" id="c-leave">0</span></button>
+    </div>
+
+    <div class="panel-head">
+      <div class="chips" id="chips"></div>
+      <button class="btn ghost" id="copyBtn" type="button">Sao chép bảng (dán vào Excel)</button>
+    </div>
+    <div class="note" id="note" hidden></div>
+    <div class="table-box"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+  </section>
+
+  <section id="welcome" class="table-box">
+    <div class="empty">
+      <strong>Chưa có dữ liệu</strong>
+      Sau khi tải file, trang sẽ hiện 4 bảng: hợp đồng ký trong tháng (ngày ký, loại HĐ, thời hạn, lương), tăng lương (lương cũ → mới), bổ nhiệm và nghỉ việc.
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(() => {
+  // ---------- helpers ----------
+  const $ = (id) => document.getElementById(id);
+  const norm = (s) => String(s ?? '').trim();
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const fold = (s) => norm(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
+
+  // Dates → {y,m,d} ; accepts Date, Excel serial, "dd/mm/yyyy", "yyyy-mm-dd"
+  function parseDate(v) {
+    if (v == null || v === '') return null;
+    if (v instanceof Date && !isNaN(v)) return { y: v.getFullYear(), m: v.getMonth() + 1, d: v.getDate() };
+    if (typeof v === 'number') {
+      const t = new Date(Math.round((v - 25569) * 86400000));
+      return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() };
+    }
+    const s = norm(v);
+    let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+    if (m) return { y: +m[3], m: +m[2], d: +m[1] };
+    m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (m) return { y: +m[1], m: +m[2], d: +m[3] };
+    return null;
+  }
+  const dKey = (p) => p ? p.y * 10000 + p.m * 100 + p.d : 0;
+  const mKey = (p) => p ? `${p.y}-${String(p.m).padStart(2, '0')}` : '';
+  const fmtD = (p) => p ? `${String(p.d).padStart(2, '0')}/${String(p.m).padStart(2, '0')}/${p.y}` : '';
+  const mLabel = (k) => { const [y, m] = k.split('-'); return `Tháng ${+m}/${y}`; };
+
+  function money(v) {
+    if (v == null || v === '') return null;
+    if (typeof v === 'number') return v;
+    const s = norm(v).replace(/[^\d\-]/g, '');
+    return s ? +s : null;
+  }
+  const fmtM = (n) => n == null ? '' : n.toLocaleString('vi-VN');
+
+  // ---------- reading files ----------
+  const state = { contract: null, career: null, leave: null, names: {}, tab: 'contract', chip: 'all', month: '' };
+
+  function sheetRows(ws) {
+    return XLSX.utils.sheet_to_json(ws, { defval: '', raw: true }).filter(r => Object.values(r).some(v => norm(v) !== ''));
+  }
+  const findCol = (row, ...names) => {
+    const keys = Object.keys(row);
+    for (const n of names) {
+      const k = keys.find(k => fold(k) === fold(n)) || keys.find(k => fold(k).startsWith(fold(n)));
+      if (k) return k;
+    }
+    return null;
+  };
+
+  function classify(wb) {
+    for (const name of wb.SheetNames) {
+      const rows = sheetRows(wb.Sheets[name]);
+      if (!rows.length) continue;
+      const head = Object.keys(rows[0]).map(fold).join('|');
+      if (head.includes('phan loai quyet dinh')) return 'career';
+      if (head.includes('ngay nghi viec')) return 'leave';
+      if (head.includes('ma hop dong') || head.includes('loai hop dong')) return 'contract';
+    }
+    return null;
+  }
+
+  function loadCareer(wb) {
+    // Every sheet that carries decisions; "Tất cả" already holds them all, other sheets are deduplicated.
+    const seen = new Map(), out = [];
+    for (const name of wb.SheetNames) {
+      const rows = sheetRows(wb.Sheets[name]);
+      if (!rows.length || !findCol(rows[0], 'Phân loại quyết định')) continue;
+      const c = (n) => findCol(rows[0], n);
+      const local = new Map();
+      const K = {
+        id: c('Mã nhân sự'), name: c('Tên nhân sự'), unit: c('Khu vực / Chuyên môn'), title: c('Chức danh'), pos: c('Vị trí công việc'),
+        type: c('Phân loại quyết định'), policy: c('Chính sách nhân sự'), date: c('Ngày có hiệu lực'),
+        salary: c('Lương'), base: c('Lương cơ bản'), allowRole: c('Phụ cấp kiêm chức vụ'), allowOther: c('Phụ cấp khác'),
+        reason: c('Lý do'), concurrent: c('Kiêm nhiệm'), status: c('Trạng thái nhân sự'), approve: c('Trạng thái phê duyệt')
+      };
+      for (const r of rows) {
+        const g = (k) => K[k] ? r[K[k]] : '';
+        const rec = {
+          id: norm(g('id')), name: norm(g('name')), unit: norm(g('unit')), title: norm(g('title')) || norm(g('pos')),
+          type: norm(g('type')), policy: norm(g('policy')), date: parseDate(g('date')),
+          salary: money(g('salary')), base: money(g('base')), allowRole: money(g('allowRole')), allowOther: money(g('allowOther')),
+          reason: norm(g('reason')), concurrent: norm(g('concurrent')), status: norm(g('status')), approve: norm(g('approve'))
+        };
+        if (!rec.id && !rec.name) continue;
+        const key = [rec.id, dKey(rec.date), rec.type, rec.policy, rec.salary, rec.base, rec.title].join('|');
+        // identical rows inside one sheet are kept; a row is skipped only when an earlier sheet already had it
+        local.set(key, (local.get(key) || 0) + 1);
+        if (local.get(key) <= (seen.get(key) || 0)) continue;
+        out.push(rec);
+      }
+      for (const [k, n] of local) seen.set(k, Math.max(seen.get(k) || 0, n));
+    }
+    return out;
+  }
+
+  function loadContract(wb) {
+    const out = [];
+    for (const name of wb.SheetNames) {
+      const rows = sheetRows(wb.Sheets[name]);
+      if (!rows.length || !findCol(rows[0], 'Loại hợp đồng')) continue;
+      const c = (n) => findCol(rows[0], n);
+      const K = {
+        name: c('Tên nhân sự'), id: c('Mã nhân sự'), title: c('Chức danh'), unit: c('Khu vực / Chuyên môn'),
+        kind: c('Hợp đồng thử việc'), type: c('Loại hợp đồng'), code: c('Mã hợp đồng'), sign: c('Ngày ký'),
+        start: c('Ngày bắt đầu'), end: c('Ngày kết thúc'), salary: c('Lương'), base: c('Lương cơ bản'),
+        allowRole: c('Phụ cấp kiêm chức vụ'), allowOther: c('Phụ cấp khác'), signState: c('Trạng thái ký'),
+        cState: c('Trạng thái hợp đồng'), status: c('Trạng thái')
+      };
+      // "Lương" must not resolve to "Lương cơ bản"
+      K.salary = Object.keys(rows[0]).find(k => fold(k) === 'luong') || null;
+      for (const r of rows) {
+        const g = (k) => K[k] ? r[K[k]] : '';
+        out.push({
+          name: norm(g('name')), id: norm(g('id')), title: norm(g('title')), unit: norm(g('unit')),
+          kind: norm(g('kind')), type: norm(g('type')), code: norm(g('code')), sign: parseDate(g('sign')),
+          start: parseDate(g('start')), end: parseDate(g('end')), salary: money(g('salary')), base: money(g('base')),
+          allowRole: money(g('allowRole')), allowOther: money(g('allowOther')),
+          signState: norm(g('signState')), cState: norm(g('cState')), status: norm(g('status'))
+        });
+      }
+      return { rows: out, hasSign: !!K.sign };
+    }
+    return { rows: out, hasSign: false };
+  }
+
+  function loadLeave(wb) {
+    for (const name of wb.SheetNames) {
+      const rows = sheetRows(wb.Sheets[name]);
+      if (!rows.length || !findCol(rows[0], 'Ngày nghỉ việc')) continue;
+      const c = (n) => findCol(rows[0], n);
+      const K = { id: c('Mã nhân sự'), name: c('Tên nhân sự'), unit: c('Khu vực / Chuyên môn'), date: c('Ngày nghỉ việc'),
+        policy: c('Chính sách thôi việc'), reason: c('Lý do nghỉ việc'), rating: c('Đánh giá'), note: c('Ghi chú'), code: c('Mã QĐ nghỉ việc') };
+      return rows.map(r => {
+        const g = (k) => K[k] ? r[K[k]] : '';
+        return { id: norm(g('id')), name: norm(g('name')), unit: norm(g('unit')), date: parseDate(g('date')),
+          policy: norm(g('policy')), reason: norm(g('reason')), rating: norm(g('rating')), note: norm(g('note')), code: norm(g('code')) };
+      });
+    }
+    return [];
+  }
+
+  async function handleFiles(files) {
+    const errs = [];
+    for (const f of files) {
+      try {
+        const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: true });
+        const kind = classify(wb);
+        if (kind === 'career') state.career = loadCareer(wb);
+        else if (kind === 'contract') state.contract = loadContract(wb);
+        else if (kind === 'leave') state.leave = loadLeave(wb);
+        else { errs.push(`“${f.name}” không giống file nào trong 3 loại báo cáo (không tìm thấy cột Phân loại quyết định / Loại hợp đồng / Ngày nghỉ việc).`); continue; }
+        state.names[kind] = f.name;
+      } catch (e) {
+        errs.push(`Không đọc được “${f.name}”. Hãy kiểm tra đây là file Excel (.xlsx) xuất từ hệ thống.`);
+      }
+    }
+    $('errBox').hidden = !errs.length;
+    $('errBox').innerHTML = errs.map(esc).join('<br>');
+    refreshSlots();
+    buildMonths();
+    render();
+  }
+
+  function refreshSlots() {
+    for (const k of ['contract', 'career', 'leave']) {
+      const el = $('slot-' + k);
+      el.classList.toggle('ok', !!state.names[k]);
+      if (state.names[k]) el.querySelector('.file').textContent = '✓ ' + state.names[k];
+    }
+    const any = Object.keys(state.names).length > 0;
+    $('report').hidden = !any; $('welcome').hidden = any; $('clearBtn').hidden = !any;
+  }
+
+  // ---------- months ----------
+  function buildMonths() {
+    const set = new Set();
+    (state.career || []).forEach(r => r.date && set.add(mKey(r.date)));
+    (state.leave || []).forEach(r => r.date && set.add(mKey(r.date)));
+    (state.contract?.rows || []).forEach(r => { const d = r.sign || r.start; d && set.add(mKey(d)); });
+    const months = [...set].sort().reverse();
+    const sel = $('monthSel');
+    const prev = state.month;
+    sel.innerHTML = months.map(m => `<option value="${m}">${mLabel(m)}</option>`).join('');
+    // default: latest month that has HR decisions or resignations (contract dates may run into the future)
+    const now = new Date(); const nowKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const decided = new Set([...(state.career || []), ...(state.leave || [])].map(r => mKey(r.date)));
+    const def = months.includes(prev) ? prev : (months.find(m => decided.has(m) && m <= nowKey) || months.find(m => m <= nowKey) || months[0] || '');
+    state.month = def; sel.value = def;
+  }
+
+  // ---------- reports ----------
+  function careerIndex() {
+    const by = new Map();
+    for (const r of state.career || []) {
+      if (!by.has(r.id)) by.set(r.id, []);
+      by.get(r.id).push(r);
+    }
+    for (const list of by.values()) list.sort((a, b) => dKey(a.date) - dKey(b.date));
+    return by;
+  }
+  const latestInfo = (by, id) => { const l = by.get(id); return l && l.length ? l[l.length - 1] : null; };
+
+  // month: 'yyyy-mm' or '*' for every month
+  function reports(month = state.month) {
+    const by = careerIndex();
+    const inM = (d) => month === '*' ? !!d : mKey(d) === month;
+    const out = { contract: [], raise: [], appoint: [], leave: [] };
+
+    if (state.contract) {
+      out.contract = state.contract.rows
+        .filter(r => inM(state.contract.hasSign ? (r.sign || r.start) : r.start))
+        .map(r => { const i = latestInfo(by, r.id); return { ...r, title: r.title || i?.title || '', unit: r.unit || i?.unit || '' }; })
+        .sort((a, b) => dKey(a.sign || a.start) - dKey(b.sign || b.start) || a.name.localeCompare(b.name, 'vi'));
+    }
+    if (state.career) {
+      out.raise = state.career.filter(r => r.type === 'Tăng lương' && inM(r.date)).map(r => {
+        const hist = by.get(r.id) || [];
+        const prev = hist.filter(h => dKey(h.date) < dKey(r.date)).pop() || null;
+        return { ...r, prev };
+      }).sort((a, b) => dKey(a.date) - dKey(b.date) || a.name.localeCompare(b.name, 'vi'));
+      out.appoint = state.career.filter(r => r.type === 'Bổ nhiệm' && inM(r.date))
+        .sort((a, b) => dKey(a.date) - dKey(b.date) || a.name.localeCompare(b.name, 'vi'));
+    }
+    if (state.leave) {
+      out.leave = state.leave.filter(r => inM(r.date)).map(r => {
+        const i = latestInfo(by, r.id); return { ...r, title: i?.title || '', unit: r.unit || i?.unit || '' };
+      }).sort((a, b) => dKey(a.date) - dKey(b.date));
+    }
+    return out;
+  }
+
+  // Column definitions: [header, html(r), text(r), class]
+  const who = (r) => `<div class="who">${esc(r.name)}<small>${esc(r.id)}</small></div>`;
+  const unitCell = (r) => `${esc(r.title)}${r.title && r.unit ? '<br>' : ''}<span class="unit">${esc(r.unit)}</span>`;
+  const diff = (n, o) => {
+    if (n == null || o == null) return '<span class="dim">—</span>';
+    const d = n - o; if (!d) return '<span class="dim">không đổi</span>';
+    const pct = o ? ` (${d > 0 ? '+' : ''}${(d / o * 100).toFixed(1).replace('.', ',')}%)` : '';
+    return `<span class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '+' : ''}${fmtM(d)}${pct}</span>`;
+  };
+  const sumAllow = (r) => (r.allowRole || 0) + (r.allowOther || 0) || null;
+
+  const COLS = {
+    contract: () => [
+      ['Nhân sự', who, r => `${r.name}\t${r.id}`, '', 'Tên nhân sự\tMã nhân sự'],
+      ['Chức danh / Đơn vị', unitCell, r => `${r.title}\t${r.unit}`, '', 'Chức danh\tĐơn vị'],
+      ['Mã HĐ', r => `<span class="mono">${esc(r.code)}</span>`, r => r.code],
+      ['Loại hợp đồng', r => `${esc(r.type)}${r.kind === 'Hợp đồng thử việc' ? ' <span class="pill pending">Thử việc</span>' : ''}`, r => r.type + (r.kind === 'Hợp đồng thử việc' ? ' (thử việc)' : '')],
+      ['Ngày ký', r => r.sign ? fmtD(r.sign) : '<span class="dim">—</span>', r => fmtD(r.sign), 'date'],
+      ['Bắt đầu', r => fmtD(r.start), r => fmtD(r.start), 'date'],
+      ['Kết thúc', r => r.end ? fmtD(r.end) : '<span class="dim">Không thời hạn</span>', r => r.end ? fmtD(r.end) : 'Không thời hạn', 'date'],
+      ['Lương HĐ', r => r.salary ? fmtM(r.salary) : '<span class="dim">—</span>', r => r.salary ?? '', 'num'],
+      ['Lương cơ bản', r => r.base ? fmtM(r.base) : '<span class="dim">—</span>', r => r.base ?? '', 'num'],
+      ['Phụ cấp', r => sumAllow(r) ? fmtM(sumAllow(r)) : '<span class="dim">—</span>', r => sumAllow(r) ?? '', 'num'],
+      ['Trạng thái ký', r => `<span class="pill ${r.signState === 'Đã ký' ? 'ok' : 'pending'}">${esc(r.signState || '—')}</span>`, r => r.signState],
+    ],
+    raise: () => [
+      ['Nhân sự', who, r => `${r.name}\t${r.id}`, '', 'Tên nhân sự\tMã nhân sự'],
+      ['Chức danh / Đơn vị', unitCell, r => `${r.title}\t${r.unit}`, '', 'Chức danh\tĐơn vị'],
+      ['Hiệu lực', r => fmtD(r.date), r => fmtD(r.date), 'date'],
+      ['Lương cũ', r => r.prev ? `${fmtM(r.prev.salary)}<br><span class="dim" style="font-size:12px">từ ${fmtD(r.prev.date)}</span>` : '<span class="dim">Chưa có QĐ trước</span>', r => r.prev?.salary ?? '', 'num'],
+      ['Lương mới', r => `<strong>${fmtM(r.salary)}</strong>`, r => r.salary ?? '', 'num'],
+      ['Chênh lệch', r => diff(r.salary, r.prev?.salary), r => (r.salary != null && r.prev?.salary != null) ? r.salary - r.prev.salary : '', 'num'],
+      ['Lương CB cũ → mới', r => `${r.prev ? fmtM(r.prev.base) : '—'} → ${fmtM(r.base)}`, r => `${r.prev?.base ?? ''}\t${r.base ?? ''}`, 'num', 'Lương CB cũ\tLương CB mới'],
+      ['Phụ cấp cũ → mới', r => `${r.prev ? (fmtM(sumAllow(r.prev)) || '0') : '—'} → ${fmtM(sumAllow(r)) || '0'}`, r => `${r.prev ? (sumAllow(r.prev) ?? 0) : ''}\t${sumAllow(r) ?? 0}`, 'num', 'Phụ cấp cũ\tPhụ cấp mới'],
+      ['Ghi chú', r => esc(r.reason), r => r.reason],
+    ],
+    appoint: () => [
+      ['Nhân sự', who, r => `${r.name}\t${r.id}`, '', 'Tên nhân sự\tMã nhân sự'],
+      ['Chức danh / Đơn vị', unitCell, r => `${r.title}\t${r.unit}`, '', 'Chức danh\tĐơn vị'],
+      ['Loại quyết định', r => `<span class="pill">${esc(r.policy)}</span>`, r => r.policy],
+      ['Hiệu lực', r => fmtD(r.date), r => fmtD(r.date), 'date'],
+      ['Lương', r => fmtM(r.salary), r => r.salary ?? '', 'num'],
+      ['Lương cơ bản', r => fmtM(r.base), r => r.base ?? '', 'num'],
+      ['Kiêm nhiệm', r => esc(r.concurrent) || '<span class="dim">—</span>', r => r.concurrent],
+    ],
+    leave: () => [
+      ['Nhân sự', who, r => `${r.name}\t${r.id}`, '', 'Tên nhân sự\tMã nhân sự'],
+      ['Chức danh / Đơn vị', unitCell, r => `${r.title}\t${r.unit}`, '', 'Chức danh\tĐơn vị'],
+      ['Ngày nghỉ việc', r => fmtD(r.date), r => fmtD(r.date), 'date'],
+      ['Mã QĐ', r => `<span class="mono">${esc(r.code)}</span>`, r => r.code],
+      ['Chính sách', r => esc(r.policy) || '<span class="dim">—</span>', r => r.policy],
+      ['Lý do', r => esc(r.reason), r => r.reason],
+      ['Đánh giá', r => esc(r.rating), r => r.rating],
+      ['Ghi chú', r => esc(r.note), r => r.note],
+    ],
+  };
+  const SRC = { contract: 'contract', raise: 'career', appoint: 'career', leave: 'leave' };
+  const SRCNAME = { contract: 'Hợp đồng', career: 'Sự nghiệp', leave: 'Quyết định thôi việc' };
+
+  let current = [];
+  function render() {
+    if (!state.month) return;
+    const R = reports();
+    for (const k in R) $('c-' + k).textContent = R[k].length;
+    document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === state.tab));
+
+    let rows = R[state.tab];
+    // chips: appointment decision types / contract kinds
+    const chipField = { appoint: 'policy', contract: 'type' }[state.tab];
+    const chips = $('chips');
+    if (chipField && rows.length) {
+      const counts = {}; rows.forEach(r => counts[r[chipField]] = (counts[r[chipField]] || 0) + 1);
+      if (state.chip !== 'all' && !counts[state.chip]) state.chip = 'all';
+      chips.innerHTML = [`<button class="chip" data-chip="all" aria-pressed="${state.chip === 'all'}">Tất cả · ${rows.length}</button>`]
+        .concat(Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([k, n]) => `<button class="chip" data-chip="${esc(k)}" aria-pressed="${state.chip === k}">${esc(k || '(trống)')} · ${n}</button>`)).join('');
+      if (state.chip !== 'all') rows = rows.filter(r => r[chipField] === state.chip);
+    } else chips.innerHTML = '';
+
+    const q = fold($('q').value);
+    if (q) rows = rows.filter(r => fold(`${r.name} ${r.id} ${r.unit} ${r.title} ${r.code || ''}`).includes(q));
+
+    // notes
+    const notes = [];
+    if (!state[SRC[state.tab]]) notes.push(`Chưa tải file ${SRCNAME[SRC[state.tab]]}, nên bảng này đang trống.`);
+    if (state.tab === 'contract' && state.contract && !state.contract.hasSign) notes.push('File hợp đồng hiện không có cột “Ngày ký”, nên danh sách được lọc theo Ngày bắt đầu hợp đồng. Nếu bổ sung cột Ngày ký vào file xuất, trang sẽ tự lọc theo ngày ký.');
+    if (state.tab === 'raise' && state.career) notes.push('Lương cũ lấy từ quyết định gần nhất trước ngày hiệu lực của lần tăng lương này (trong file Sự nghiệp).');
+    $('note').hidden = !notes.length; $('note').innerHTML = notes.map(esc).join('<br>');
+
+    const cols = COLS[state.tab]().filter(c => !(c[0] === 'Ngày ký' && !state.contract?.hasSign));
+    $('tbl').tHead.innerHTML = '<tr>' + cols.map(c => `<th class="${c[3] || ''}">${c[0]}</th>`).join('') + '</tr>';
+    $('tbl').tBodies[0].innerHTML = rows.length
+      ? rows.map(r => '<tr>' + cols.map(c => `<td class="${c[3] || ''}">${c[1](r)}</td>`).join('') + '</tr>').join('')
+      : `<tr><td colspan="${cols.length}"><div class="empty"><strong>Không có nhân sự nào</strong>${q ? 'Không khớp với từ khoá tìm kiếm.' : 'trong ' + mLabel(state.month).toLowerCase() + '.'}</div></td></tr>`;
+    current = { rows, cols };
+  }
+
+  function copyTable() {
+    const { rows, cols } = current;
+    const head = cols.map(c => c[4] || c[0]).join('\t');
+    const body = rows.map(r => cols.map(c => String(c[2](r) ?? '').replace(/[\t\n]+/g, ' ').replace(/ \t/g, '\t')).join('\t'));
+    const text = [head, ...body].join('\n');
+    const done = () => toast(`Đã sao chép ${rows.length} dòng. Mở Excel và dán (Ctrl+V).`);
+    navigator.clipboard.writeText(text).then(done).catch(() => {
+      const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch { toast('Trình duyệt chặn sao chép. Hãy bôi đen bảng và nhấn Ctrl+C.'); }
+      ta.remove();
+    });
+  }
+  // ---------- Excel export: one sheet per report ----------
+  const SHEETS = [['contract', 'Ký hợp đồng'], ['raise', 'Tăng lương'], ['appoint', 'Bổ nhiệm'], ['leave', 'Nghỉ việc']];
+  const toCell = (v) => (typeof v === 'string' && /^-?\d+$/.test(v) && v.length < 16) ? +v : v;
+  const rowDate = (k, r) => k === 'contract' ? (r.sign || r.start) : r.date;
+
+  function buildWorkbook(month) {
+    const R = reports(month), all = month === '*';
+    const wb = XLSX.utils.book_new();
+    const summary = [['Báo cáo biến động nhân sự'], ['Kỳ báo cáo', all ? 'Tất cả các tháng' : mLabel(month)], [], ['Hạng mục', 'Số nhân sự']];
+    SHEETS.forEach(([k, name]) => summary.push([name, R[k].length]));
+    const ws0 = XLSX.utils.aoa_to_sheet(summary); ws0['!cols'] = [{ wch: 26 }, { wch: 20 }];
+    XLSX.utils.book_append_sheet(wb, ws0, 'Tổng hợp');
+    for (const [k, name] of SHEETS) {
+      const cols = COLS[k]().filter(c => !(c[0] === 'Ngày ký' && !state.contract?.hasSign));
+      const head = cols.flatMap(c => (c[4] || c[0]).split('\t'));
+      const body = R[k].map(r => cols.flatMap(c => String(c[2](r) ?? '').split('\t').map(s => { s = s.replace(/\s+/g, ' ').trim(); return c[3] === 'num' ? toCell(s) : s; })));
+      if (all) { head.unshift('Tháng'); body.forEach((row, i) => row.unshift(mLabel(mKey(rowDate(k, R[k][i]))))); }
+      const ws = XLSX.utils.aoa_to_sheet([head, ...body]);
+      ws['!cols'] = head.map((h, i) => ({ wch: Math.min(48, Math.max(h.length + 2, ...body.map(r => String(r[i] ?? '').length + 2))) }));
+      ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: body.length, c: head.length - 1 } }) };
+      for (let r = 1; r <= body.length; r++) for (let c = 0; c < head.length; c++) {
+        const cell = ws[XLSX.utils.encode_cell({ r, c })];
+        if (cell && cell.t === 'n' && cell.v >= 100000) cell.z = '#,##0';
+      }
+      XLSX.utils.book_append_sheet(wb, ws, name);
+    }
+    return wb;
+  }
+
+  let downloadsApi;
+  (async () => { try { downloadsApi = await window.claude?.use?.('downloads'); } catch { downloadsApi = null; } })();
+
+  async function exportExcel() {
+    const scope = $('exportScope').value === 'all' ? '*' : state.month;
+    const filename = `bien-dong-nhan-su-${scope === '*' ? 'tat-ca' : scope}.xlsx`;
+    const wb = buildWorkbook(scope);
+    if (downloadsApi) {
+      const data = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]);
+      try { await downloadsApi.save({ filename, data }); toast('Đã xuất ' + filename); }
+      catch (e) {
+        if (e?.code === 'declined') return;
+        toast(e?.code === 'rate_limited' ? 'Đang có một hộp thoại tải xuống mở, hãy xác nhận nó trước.' : 'Không xuất được file trong chế độ xem này.');
+      }
+    } else {
+      XLSX.writeFile(wb, filename); // page opened as a normal web page / local file
+    }
+  }
+
+  let tt; function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(tt); tt = setTimeout(() => t.hidden = true, 2600); }
+
+  // ---------- wiring ----------
+  $('pickBtn').onclick = () => $('fileInput').click();
+  $('fileInput').onchange = (e) => { handleFiles([...e.target.files]); e.target.value = ''; };
+  $('clearBtn').onclick = () => {
+    Object.assign(state, { contract: null, career: null, leave: null, names: {}, month: '', chip: 'all' });
+    ['contract', 'career', 'leave'].forEach(k => { $('slot-' + k).classList.remove('ok'); });
+    $('slot-contract').querySelector('.file').textContent = 'hop-dong.report…xlsx';
+    $('slot-career').querySelector('.file').textContent = 'su-nghiep.general.report…xlsx';
+    $('slot-leave').querySelector('.file').textContent = 'quyet-dinh-thoi-viec.report…xlsx';
+    refreshSlots();
+  };
+  const drop = $('drop');
+  ['dragenter', 'dragover'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); if (ev === 'drop' || !e.relatedTarget) drop.classList.remove('over'); }));
+  document.addEventListener('drop', e => { if ($('app').hidden) return; const f = [...(e.dataTransfer?.files || [])]; if (f.length) handleFiles(f); });
+  $('monthSel').onchange = (e) => { state.month = e.target.value; state.chip = 'all'; render(); };
+  $('q').oninput = render;
+  document.querySelector('.tabs').onclick = (e) => { const t = e.target.closest('.tab'); if (!t) return; state.tab = t.dataset.tab; state.chip = 'all'; render(); };
+  $('chips').onclick = (e) => { const c = e.target.closest('.chip'); if (!c) return; state.chip = c.dataset.chip; render(); };
+  $('copyBtn').onclick = copyTable;
+  $('exportBtn').onclick = exportExcel;
+
+  // ---------- password gate ----------
+  // Only the SHA-256 of "hr-bdns:" + password is stored here. To change the password, replace this hash.
+  const PW_HASH = '71b410d82cd07550fe5b04553eb39123da1604e54435f51157f1de563884f789';
+  const UNLOCK_KEY = 'hr-bdns-unlocked';
+  async function sha256(text) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  function setLocked(locked) {
+    $('gate').hidden = !locked; $('app').hidden = locked;
+    try { locked ? sessionStorage.removeItem(UNLOCK_KEY) : sessionStorage.setItem(UNLOCK_KEY, PW_HASH); } catch {}
+    if (locked) { $('gatePw').value = ''; $('gatePw').focus(); }
+  }
+  $('gateForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    let ok = false;
+    try { ok = (await sha256('hr-bdns:' + $('gatePw').value)) === PW_HASH; }
+    catch { $('gateErr').textContent = 'Trình duyệt này không hỗ trợ kiểm tra mật khẩu. Hãy mở bằng Chrome, Edge hoặc Safari bản mới.'; $('gateErr').hidden = false; return; }
+    if (ok) { $('gateErr').hidden = true; setLocked(false); }
+    else { $('gateErr').textContent = 'Mật khẩu không đúng. Kiểm tra lại chữ hoa, chữ thường và thử lại.'; $('gateErr').hidden = false; $('gatePw').select(); }
+  });
+  $('lockBtn').onclick = () => { $('clearBtn').click(); setLocked(true); };
+  let unlocked = false;
+  try { unlocked = sessionStorage.getItem(UNLOCK_KEY) === PW_HASH; } catch {}
+  setLocked(!unlocked);
+  window.__hr = { handleFiles, state, reports, buildWorkbook };
+})();
+</script>
+
+</body>
+</html>
