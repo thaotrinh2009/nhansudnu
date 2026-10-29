@@ -23,6 +23,9 @@
   --down: #b2402b;
   --warn: #9a6a00;
   --warn-soft: #fbf1d9;
+  --late: #b2402b; --late-soft: #fbe9e5;
+  --early: #9a6a00; --early-soft: #fbf1d9;
+  --forgot: #2456a6; --forgot-soft: #e6eefb;
   --font-body: "Be Vietnam Pro", system-ui, "Segoe UI", Roboto, sans-serif;
   color-scheme: light; /* always light, regardless of the viewer's theme */
 }
@@ -97,13 +100,47 @@ td.date { white-space: nowrap; }
 .gate-card input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .gate-card .btn { margin-top: 6px; padding: 10px 14px; }
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 16px; border-radius: 8px; font-weight: 500; }
+/* Module switch */
+.modules { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; width: fit-content; max-width: 100%; }
+.mod { font: inherit; font-weight: 600; border: none; background: transparent; color: var(--muted); padding: 8px 14px; border-radius: 7px; cursor: pointer; }
+.mod:hover { color: var(--ink); }
+.mod[aria-selected=true] { background: var(--accent); color: var(--surface); }
+.mod:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Attendance */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 2px; min-width: 0; }
+.stat b { font-size: 26px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.stat .dim { font-size: 12.5px; }
+.t-late { color: var(--late); } .t-early { color: var(--early); } .t-forgot { color: var(--forgot); } .t-ok { color: var(--up); }
+.pill.late { border-color: var(--late); color: var(--late); background: var(--late-soft); }
+.pill.early { border-color: var(--early); color: var(--early); background: var(--early-soft); }
+.pill.forgot { border-color: var(--forgot); color: var(--forgot); background: var(--forgot-soft); }
+.mgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.mcard { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 4px; }
+.mcard .mhead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--line); margin-bottom: 2px; }
+.mcard .mhead b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.mcard .row { display: flex; justify-content: space-between; font-size: 13px; font-variant-numeric: tabular-nums; }
+.sec-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.sec-head h3 { margin: 0; font-size: 15px; font-weight: 700; }
+.track { display: inline-block; width: 90px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; vertical-align: middle; margin-right: 6px; }
+.track i { display: block; height: 100%; background: var(--accent); }
+th.c, td.c { text-align: center; }
+th.grp { text-align: center; background: var(--accent-soft); color: var(--accent); }
+tr.total td { font-weight: 700; background: var(--bg); }
+td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pager { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; padding: 10px 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.pager .pgs { display: flex; flex-wrap: wrap; gap: 4px; }
+.pg { font: inherit; font-size: 12.5px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 3px 9px; border-radius: 6px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.pg[aria-current=page] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.pg:disabled { opacity: .4; cursor: default; }
 @media (max-width: 600px) { .wrap { padding: 20px 16px 48px; } h1 { font-size: 19px; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
 <div class="gate" id="gate">
   <form class="gate-card" id="gateForm" autocomplete="off">
-    <span class="label">Biến động nhân sự</span>
+    <span class="label">Báo cáo nhân sự</span>
     <h2>Nhập mật khẩu để mở ứng dụng</h2>
     <label class="label" for="gatePw">Mật khẩu</label>
     <input type="password" id="gatePw" autocomplete="current-password" required>
@@ -115,11 +152,18 @@ td.date { white-space: nowrap; }
 <div class="wrap" id="app" hidden>
   <header style="display:flex;gap:12px;justify-content:space-between;align-items:start;flex-wrap:wrap">
     <div style="min-width:0;flex:1">
-    <h1>Biến động nhân sự theo tháng</h1>
-    <p class="sub">Tải lên 3 file xuất từ hệ thống (Hợp đồng, Quyết định thôi việc, Sự nghiệp), chọn tháng để xem ai ký hợp đồng, tăng lương, được bổ nhiệm và nghỉ việc. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.</p>
+    <h1 id="appTitle">Biến động nhân sự theo tháng</h1>
+    <p class="sub" id="appSub">Tải lên 3 file xuất từ hệ thống (Hợp đồng, Quyết định thôi việc, Sự nghiệp), chọn tháng để xem ai ký hợp đồng, tăng lương, được bổ nhiệm và nghỉ việc. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.</p>
     </div>
     <button class="btn ghost" id="lockBtn" type="button">Khoá ứng dụng</button>
   </header>
+
+  <nav class="modules" role="tablist" aria-label="Chọn báo cáo">
+    <button class="mod" role="tab" id="mod-btn-hr" data-mod="hr" aria-selected="true">Biến động nhân sự</button>
+    <button class="mod" role="tab" id="mod-btn-att" data-mod="att" aria-selected="false">Đi muộn – Về sớm</button>
+  </nav>
+
+  <div id="mod-hr" style="display:grid;gap:20px">
 
   <section class="drop" id="drop">
     <div class="drop-head">
@@ -182,6 +226,69 @@ td.date { white-space: nowrap; }
       Sau khi tải file, trang sẽ hiện 4 bảng: hợp đồng ký trong tháng (ngày ký, loại HĐ, thời hạn, lương), tăng lương (lương cũ → mới), bổ nhiệm và nghỉ việc.
     </div>
   </section>
+  </div>
+
+  <div id="mod-att" hidden style="display:grid;gap:20px">
+    <section class="drop" id="attDrop">
+      <div class="drop-head">
+        <span class="label">Dữ liệu chấm công</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <input type="file" id="attFile" accept=".xlsx,.xls" hidden>
+          <button class="btn" id="attPick" type="button">Chọn file Excel</button>
+          <button class="btn ghost" id="attClear" type="button" hidden>Xoá dữ liệu</button>
+        </div>
+      </div>
+      <div class="slots">
+        <div class="slot" id="attSlot"><span class="name">Báo cáo đi muộn – về sớm</span><span class="file">File Excel có sheet “Dữ liệu gốc”</span></div>
+      </div>
+      <div class="dim">Kéo thả file vào đây hoặc bấm “Chọn file Excel”. Cần các cột: Tháng, Mã NV, Họ và tên, Khoa/Bộ phận, Loại vi phạm, Ngày, Giờ vào, Giờ ra, Muộn/Sớm (phút), Đơn từ liên quan, Kết quả.</div>
+      <div class="err" id="attErr" hidden></div>
+    </section>
+
+    <section id="attReport" hidden style="display:grid;gap:16px">
+      <div class="stats" id="attStats"></div>
+      <div class="bar">
+        <div class="field">
+          <label class="label" for="attMonth">Tháng</label>
+          <select id="attMonth"></select>
+        </div>
+        <div class="field" id="attTypeField">
+          <label class="label" for="attType">Loại vi phạm</label>
+          <select id="attType">
+            <option value="all">Tất cả</option>
+            <option value="late">Đi muộn</option>
+            <option value="early">Về sớm</option>
+            <option value="forgot">Quên chấm công</option>
+          </select>
+        </div>
+        <div class="field" style="min-width:0">
+          <label class="label" for="attQ">Tìm nhân sự</label>
+          <input type="search" id="attQ" placeholder="Tên, mã NV, khoa / bộ phận…">
+        </div>
+        <div class="field export">
+          <span class="label">Xuất Excel (theo tháng đang chọn)</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn ghost" id="attCopy" type="button">Sao chép bảng</button>
+            <button class="btn" id="attExport" type="button">Xuất Excel</button>
+          </div>
+        </div>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="atab-summary" data-tab="summary" aria-selected="true">Tóm tắt <span class="count" id="ac-summary">0</span></button>
+        <button class="tab" role="tab" id="atab-people" data-tab="people" aria-selected="false">Tổng hợp theo nhân sự <span class="count" id="ac-people">0</span></button>
+        <button class="tab" role="tab" id="atab-count" data-tab="count" aria-selected="false">Chi tiết bị tính <span class="count" id="ac-count">0</span></button>
+        <button class="tab" role="tab" id="atab-free" data-tab="free" aria-selected="false">Có đơn – không tính <span class="count" id="ac-free">0</span></button>
+      </div>
+      <div id="attView" style="display:grid;gap:16px"></div>
+    </section>
+
+    <section id="attWelcome" class="table-box">
+      <div class="empty">
+        <strong>Chưa có dữ liệu chấm công</strong>
+        Sau khi tải file, trang sẽ hiện tóm tắt theo tháng và theo khoa / bộ phận, bảng tổng hợp từng nhân sự, chi tiết các lượt bị tính và các lượt có đơn được miễn trừ.
+      </div>
+    </section>
+  </div>
 </div>
 <div class="toast" id="toast" hidden></div>
 
@@ -483,7 +590,7 @@ td.date { white-space: nowrap; }
     if (!state.month) return;
     const R = reports();
     for (const k in R) $('c-' + k).textContent = R[k].length;
-    document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === state.tab));
+    document.querySelectorAll('#mod-hr .tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === state.tab));
 
     let rows = R[state.tab];
     // chips: appointment decision types / contract kinds
@@ -561,8 +668,9 @@ td.date { white-space: nowrap; }
 
   async function exportExcel() {
     const scope = $('exportScope').value === 'all' ? '*' : state.month;
-    const filename = `bien-dong-nhan-su-${scope === '*' ? 'tat-ca' : scope}.xlsx`;
-    const wb = buildWorkbook(scope);
+    await saveWorkbook(buildWorkbook(scope), `bien-dong-nhan-su-${scope === '*' ? 'tat-ca' : scope}.xlsx`);
+  }
+  async function saveWorkbook(wb, filename) {
     if (downloadsApi) {
       const data = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]);
       try { await downloadsApi.save({ filename, data }); toast('Đã xuất ' + filename); }
@@ -588,13 +696,31 @@ td.date { white-space: nowrap; }
     $('slot-leave').querySelector('.file').textContent = 'quyet-dinh-thoi-viec.report…xlsx';
     refreshSlots();
   };
-  const drop = $('drop');
-  ['dragenter', 'dragover'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
-  ['dragleave', 'drop'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); if (ev === 'drop' || !e.relatedTarget) drop.classList.remove('over'); }));
-  document.addEventListener('drop', e => { if ($('app').hidden) return; const f = [...(e.dataTransfer?.files || [])]; if (f.length) handleFiles(f); });
+  // ---------- modules: HR changes / attendance ----------
+  let mod = 'hr';
+  const MOD_TEXT = {
+    hr: ['Biến động nhân sự theo tháng', 'Tải lên 3 file xuất từ hệ thống (Hợp đồng, Quyết định thôi việc, Sự nghiệp), chọn tháng để xem ai ký hợp đồng, tăng lương, được bổ nhiệm và nghỉ việc. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.'],
+    att: ['Chấm công: đi muộn, về sớm', 'Tải lên file báo cáo chấm công (sheet “Dữ liệu gốc”) để xem số lượt đi muộn, về sớm, quên chấm công theo tháng, theo đơn vị và theo từng nhân sự. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.'],
+  };
+  function setModule(m) {
+    mod = m;
+    document.querySelectorAll('.mod').forEach(b => b.setAttribute('aria-selected', b.dataset.mod === m));
+    $('mod-hr').hidden = m !== 'hr'; $('mod-att').hidden = m !== 'att';
+    $('appTitle').textContent = MOD_TEXT[m][0]; $('appSub').textContent = MOD_TEXT[m][1];
+  }
+  document.querySelector('.modules').onclick = (e) => { const b = e.target.closest('.mod'); if (b) setModule(b.dataset.mod); };
+  const dropZone = () => $(mod === 'hr' ? 'drop' : 'attDrop');
+  ['dragenter', 'dragover'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); dropZone().classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); if (ev === 'drop' || !e.relatedTarget) { $('drop').classList.remove('over'); $('attDrop').classList.remove('over'); } }));
+  document.addEventListener('drop', e => {
+    if ($('app').hidden) return;
+    const f = [...(e.dataTransfer?.files || [])];
+    if (!f.length) return;
+    if (mod === 'att') window.__att?.load(f[0]); else handleFiles(f);
+  });
   $('monthSel').onchange = (e) => { state.month = e.target.value; state.chip = 'all'; render(); };
   $('q').oninput = render;
-  document.querySelector('.tabs').onclick = (e) => { const t = e.target.closest('.tab'); if (!t) return; state.tab = t.dataset.tab; state.chip = 'all'; render(); };
+  document.querySelector('#mod-hr .tabs').onclick = (e) => { const t = e.target.closest('.tab'); if (!t) return; state.tab = t.dataset.tab; state.chip = 'all'; render(); };
   $('chips').onclick = (e) => { const c = e.target.closest('.chip'); if (!c) return; state.chip = c.dataset.chip; render(); };
   $('copyBtn').onclick = copyTable;
   $('exportBtn').onclick = exportExcel;
@@ -620,11 +746,284 @@ td.date { white-space: nowrap; }
     if (ok) { $('gateErr').hidden = true; setLocked(false); }
     else { $('gateErr').textContent = 'Mật khẩu không đúng. Kiểm tra lại chữ hoa, chữ thường và thử lại.'; $('gateErr').hidden = false; $('gatePw').select(); }
   });
-  $('lockBtn').onclick = () => { $('clearBtn').click(); setLocked(true); };
+  $('lockBtn').onclick = () => { $('clearBtn').click(); window.__att?.clear(); setLocked(true); };
   let unlocked = false;
   try { unlocked = sessionStorage.getItem(UNLOCK_KEY) === PW_HASH; } catch {}
   setLocked(!unlocked);
   window.__hr = { handleFiles, state, reports, buildWorkbook };
+  window.__shared = { toast, saveWorkbook };
+})();
+</script>
+<script>
+// ===== Attendance module: late arrivals / early leaves / missed punches =====
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const { toast, saveWorkbook } = window.__shared;
+  const norm = (s) => String(s ?? '').trim();
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const fold = (s) => norm(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
+  const fmt = (n) => (+n || 0).toLocaleString('vi-VN');
+  const PS = 50;
+
+  const TYPES = [['late', 'Đi muộn', 'ĐM'], ['early', 'Về sớm', 'VS'], ['forgot', 'Quên chấm công', 'QCC']];
+  const TYPE_LABEL = { late: 'Đi muộn', early: 'Về sớm', forgot: 'Quên chấm công' };
+  const typeKey = (v) => { const f = fold(v); return f.includes('muon') ? 'late' : f.includes('som') ? 'early' : f.includes('quen') ? 'forgot' : 'other'; };
+  const resKey = (v) => { const f = fold(v); return f.startsWith('khong') ? 'free' : f.includes('tinh') ? 'count' : ''; };
+  const monthOrder = (m) => { const x = norm(m).match(/(\d{1,2})\D+(\d{4})/); return x ? +x[2] * 100 + +x[1] : 0; };
+  const monthLabel = (m) => { const x = norm(m).match(/(\d{1,2})\D+(\d{4})/); return x ? `Tháng ${+x[1]}/${x[2]}` : (norm(m) || '(Không rõ tháng)'); };
+
+  // header names (accent-folded) → field
+  const COLS = {
+    month: ['thang'], id: ['ma nv', 'ma nhan su', 'ma nhan vien'], name: ['ho va ten', 'ten nhan su', 'ho ten'],
+    unit: ['khoa/bo phan', 'khoa / bo phan', 'bo phan', 'don vi', 'phong ban'], type: ['loai vi pham', 'loai'],
+    date: ['ngay'], tin: ['gio vao'], tout: ['gio ra'], mins: ['muon/som (phut)', 'so phut', 'phut'],
+    doc: ['don tu lien quan', 'don tu'], result: ['ket qua'],
+  };
+
+  const S = { rows: [], months: [], file: '', month: 'all', type: 'all', q: '', tab: 'summary', page: { people: 1, count: 1, free: 1 } };
+
+  // ---------- load ----------
+  async function load(file) {
+    $('attErr').hidden = true;
+    try {
+      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+      const rank = (n) => /goc|raw|data/.test(fold(n)) ? 1 : 0;
+      let found = null;
+      for (const sn of [...wb.SheetNames].sort((a, b) => rank(b) - rank(a))) {
+        const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: false, defval: '' });
+        const hi = aoa.slice(0, 15).findIndex(r => r.some(c => fold(c) === 'ket qua') && r.some(c => COLS.id.includes(fold(c))));
+        if (hi >= 0) { found = { aoa, hi }; break; }
+      }
+      if (!found) throw new Error(`Không tìm thấy bảng dữ liệu trong “${file.name}”. File cần có sheet “Dữ liệu gốc” với các cột Mã NV, Loại vi phạm và Kết quả.`);
+      const head = found.aoa[found.hi].map(fold);
+      const idx = {};
+      for (const [k, names] of Object.entries(COLS)) {
+        let i = -1;
+        for (const n of names) { i = head.indexOf(n); if (i >= 0) break; }
+        if (i < 0) for (const n of names) { i = head.findIndex(h => h.startsWith(n)); if (i >= 0) break; }
+        idx[k] = i;
+      }
+      const rows = found.aoa.slice(found.hi + 1).map(r => {
+        const o = {};
+        for (const k in idx) o[k] = idx[k] >= 0 ? norm(r[idx[k]]) : '';
+        o.tk = typeKey(o.type); o.rk = resKey(o.result);
+        return o;
+      }).filter(o => (o.id || o.name) && o.rk);
+      if (!rows.length) throw new Error(`“${file.name}” không có dòng nào có Kết quả là “BỊ TÍNH” hoặc “KHÔNG TÍNH”.`);
+      Object.assign(S, { rows, file: file.name, month: 'all', type: 'all', q: '', page: { people: 1, count: 1, free: 1 } });
+      S.months = [...new Set(rows.map(r => r.month))].sort((a, b) => monthOrder(a) - monthOrder(b) || a.localeCompare(b));
+      $('attMonth').innerHTML = '<option value="all">Tất cả các tháng</option>' + S.months.map(m => `<option value="${esc(m)}">${esc(monthLabel(m))}</option>`).join('');
+      $('attMonth').value = 'all'; $('attType').value = 'all'; $('attQ').value = '';
+      $('attSlot').classList.add('ok'); $('attSlot').querySelector('.file').textContent = '✓ ' + file.name;
+      $('attReport').hidden = false; $('attWelcome').hidden = true; $('attClear').hidden = false;
+      render();
+    } catch (e) {
+      $('attErr').textContent = e?.message || `Không đọc được “${file.name}”. Hãy kiểm tra đây là file Excel (.xlsx).`;
+      $('attErr').hidden = false;
+    }
+  }
+  function clear() {
+    Object.assign(S, { rows: [], months: [], file: '' });
+    $('attSlot').classList.remove('ok'); $('attSlot').querySelector('.file').textContent = 'File Excel có sheet “Dữ liệu gốc”';
+    $('attReport').hidden = true; $('attWelcome').hidden = false; $('attClear').hidden = true; $('attErr').hidden = true;
+  }
+
+  // ---------- data ----------
+  const inM = (r) => S.month === 'all' || r.month === S.month;
+  const matchQ = (r) => !S.q || fold(`${r.id} ${r.name} ${r.unit}`).includes(S.q);
+  const viewMonths = () => S.month === 'all' ? S.months : [S.month];
+  const tally = (rs) => { const t = { late: 0, early: 0, forgot: 0, total: rs.length }; rs.forEach(r => { if (t[r.tk] != null) t[r.tk]++; }); return t; };
+
+  function monthData() {
+    return viewMonths().map(m => {
+      const rs = S.rows.filter(r => r.month === m && r.rk === 'count');
+      return { m, ...tally(rs), people: new Set(rs.map(r => r.id)).size, free: S.rows.filter(r => r.month === m && r.rk === 'free').length };
+    });
+  }
+  function unitData() {
+    const map = new Map();
+    S.rows.filter(r => r.rk === 'count' && inM(r)).forEach(r => { const k = r.unit || '(Chưa rõ)'; if (!map.has(k)) map.set(k, []); map.get(k).push(r); });
+    return [...map].map(([unit, rs]) => ({ unit, ...tally(rs), people: new Set(rs.map(r => r.id)).size })).sort((a, b) => b.total - a.total);
+  }
+  function peopleData(useQ = true) {
+    const map = new Map();
+    S.rows.filter(r => r.rk === 'count' && inM(r) && (!useQ || matchQ(r))).forEach(r => {
+      if (!map.has(r.id)) map.set(r.id, { id: r.id, name: r.name, unit: r.unit, c: {}, late: 0, early: 0, forgot: 0, total: 0 });
+      const e = map.get(r.id);
+      e.c[r.month] = e.c[r.month] || { late: 0, early: 0, forgot: 0 };
+      if (e.c[r.month][r.tk] != null) { e.c[r.month][r.tk]++; e[r.tk]++; }
+      e.total++;
+    });
+    return [...map.values()].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'vi'));
+  }
+  const detailData = (rk, useFilters = true) => S.rows.filter(r => r.rk === rk && inM(r) && (!useFilters || ((S.type === 'all' || r.tk === S.type) && matchQ(r))));
+
+  // ---------- render ----------
+  const pill = (r) => r.tk === 'other' ? `<span class="pill">${esc(r.type || '—')}</span>` : `<span class="pill ${r.tk}">${TYPE_LABEL[r.tk]}</span>`;
+  const n0 = (n, cls) => n ? `<span class="${cls}">${fmt(n)}</span>` : '<span class="dim">—</span>';
+  const empty = (t, s) => `<div class="table-box"><div class="empty"><strong>${t}</strong>${s}</div></div>`;
+
+  function pager(key, total) {
+    const pages = Math.max(1, Math.ceil(total / PS)), p = Math.min(S.page[key], pages);
+    S.page[key] = p;
+    if (pages === 1) return '';
+    const btn = (n, label, dis) => `<button class="pg" type="button" data-pg="${n}" ${dis ? 'disabled' : ''} ${n === p && !label ? 'aria-current="page"' : ''}>${label || n}</button>`;
+    let b = btn(p - 1, '‹ Trước', p === 1);
+    for (let i = Math.max(1, p - 2); i <= Math.min(pages, p + 2); i++) b += btn(i);
+    b += btn(p + 1, 'Sau ›', p === pages);
+    return `<div class="pager"><span>Dòng ${fmt((p - 1) * PS + 1)}–${fmt(Math.min(p * PS, total))} / ${fmt(total)}</span><div class="pgs">${b}</div></div>`;
+  }
+  const pageSlice = (key, arr) => arr.slice((S.page[key] - 1) * PS, S.page[key] * PS);
+
+  function render() {
+    if (!S.rows.length) return;
+    const counted = S.rows.filter(r => r.rk === 'count' && inM(r)), free = S.rows.filter(r => r.rk === 'free' && inM(r));
+    const t = tally(counted), people = new Set(counted.map(r => r.id)).size;
+    const period = S.month === 'all' ? 'toàn kỳ' : monthLabel(S.month).toLowerCase();
+    $('attStats').innerHTML = [
+      ['Tổng lượt bị tính', fmt(t.total), `${fmt(people)} nhân sự · ${period}`, ''],
+      ['Đi muộn', fmt(t.late), 'lượt', 't-late'],
+      ['Về sớm', fmt(t.early), 'lượt', 't-early'],
+      ['Quên chấm công', fmt(t.forgot), 'lượt', 't-forgot'],
+      ['Có đơn – không tính', fmt(free.length), 'lượt được miễn trừ', 't-ok'],
+    ].map(([l, n, sub, c]) => `<div class="stat"><span class="label">${l}</span><b class="${c}">${n}</b><span class="dim">${sub}</span></div>`).join('');
+    $('ac-summary').textContent = viewMonths().length;
+    $('ac-people').textContent = fmt(people);
+    $('ac-count').textContent = fmt(t.total);
+    $('ac-free').textContent = fmt(free.length);
+    document.querySelectorAll('#mod-att .tab').forEach(b => b.setAttribute('aria-selected', b.dataset.tab === S.tab));
+    $('attTypeField').hidden = !(S.tab === 'count' || S.tab === 'free');
+    ({ summary: renderSummary, people: renderPeople, count: () => renderDetail('count'), free: () => renderDetail('free') })[S.tab]();
+  }
+
+  function renderSummary() {
+    const months = monthData(), units = unitData(), all = units.reduce((s, u) => s + u.total, 0);
+    const cards = months.map(m => `<div class="mcard">
+        <div class="mhead"><span class="label">${esc(monthLabel(m.m))}</span><b>${fmt(m.total)}</b></div>
+        <div class="row"><span>Đi muộn</span><span class="t-late">${fmt(m.late)}</span></div>
+        <div class="row"><span>Về sớm</span><span class="t-early">${fmt(m.early)}</span></div>
+        <div class="row"><span>Quên chấm công</span><span class="t-forgot">${fmt(m.forgot)}</span></div>
+        <div class="row"><span class="dim">Nhân sự vi phạm</span><span>${fmt(m.people)}</span></div>
+        <div class="row"><span class="dim">Có đơn – không tính</span><span class="t-ok">${fmt(m.free)}</span></div>
+      </div>`).join('');
+    const q = S.q;
+    const list = q ? units.filter(u => fold(u.unit).includes(q)) : units;
+    const rows = list.map((u, i) => {
+      const pct = all ? Math.round(u.total / all * 100) : 0;
+      return `<tr><td class="c dim">${i + 1}</td><td>${esc(u.unit)}</td><td class="num"><strong>${fmt(u.total)}</strong></td>
+        <td class="num">${n0(u.late, 't-late')}</td><td class="num">${n0(u.early, 't-early')}</td><td class="num">${n0(u.forgot, 't-forgot')}</td>
+        <td class="num">${fmt(u.people)}</td><td class="num"><span class="track"><i style="width:${pct}%"></i></span>${pct}%</td></tr>`;
+    }).join('');
+    $('attView').innerHTML = `
+      <div class="mgrid">${cards}</div>
+      <div class="sec-head"><h3>Vi phạm bị tính theo khoa / bộ phận</h3><span class="dim">${fmt(list.length)} đơn vị · ${S.month === 'all' ? 'toàn kỳ' : esc(monthLabel(S.month))}</span></div>
+      ${list.length ? `<div class="table-box"><table><thead><tr><th class="c">#</th><th>Khoa / Bộ phận</th><th class="num">Bị tính</th><th class="num">Đi muộn</th><th class="num">Về sớm</th><th class="num">Quên chấm</th><th class="num">Nhân sự</th><th class="num">Tỷ lệ</th></tr></thead><tbody>${rows}</tbody></table></div>`
+        : empty('Không có đơn vị nào', q ? 'Không khớp với từ khoá tìm kiếm.' : 'Không có lượt bị tính trong kỳ này.')}`;
+  }
+
+  function renderPeople() {
+    const list = peopleData(), months = viewMonths().filter(m => list.some(e => e.c[m]));
+    if (!list.length) { $('attView').innerHTML = empty('Không có nhân sự nào', S.q ? 'Không khớp với từ khoá tìm kiếm.' : 'Không có lượt bị tính trong kỳ này.'); return; }
+    const pagerHtml = pager('people', list.length);
+    const start = (S.page.people - 1) * PS;
+    const cells = (c, cls = '') => TYPES.map(([k]) => `<td class="c ${cls}">${n0(c?.[k], 't-' + k)}</td>`).join('');
+    const body = pageSlice('people', list).map((e, i) => `<tr><td class="c dim">${start + i + 1}</td><td class="mono">${esc(e.id)}</td><td class="who">${esc(e.name)}</td><td class="unit trunc" title="${esc(e.unit)}">${esc(e.unit)}</td>
+      ${months.map(m => cells(e.c[m])).join('')}${months.length > 1 ? cells(e) : ''}<td class="c"><strong class="t-late">${fmt(e.total)}</strong></td></tr>`).join('');
+    const sum = (m, k) => list.reduce((s, e) => s + (m ? (e.c[m]?.[k] || 0) : e[k]), 0);
+    const totalRow = `<tr class="total"><td colspan="4">Tổng cộng (${fmt(list.length)} nhân sự)</td>
+      ${months.map(m => TYPES.map(([k]) => `<td class="c">${fmt(sum(m, k))}</td>`).join('')).join('')}
+      ${months.length > 1 ? TYPES.map(([k]) => `<td class="c">${fmt(sum(null, k))}</td>`).join('') : ''}<td class="c">${fmt(list.reduce((s, e) => s + e.total, 0))}</td></tr>`;
+    const sub = TYPES.map(([, , a]) => `<th class="c">${a}</th>`).join('');
+    $('attView').innerHTML = `<div class="sec-head"><h3>Tổng hợp lượt bị tính theo nhân sự</h3><span class="dim">ĐM: đi muộn · VS: về sớm · QCC: quên chấm công</span></div>
+      <div class="table-box"><table><thead>
+        <tr><th rowspan="2" class="c">#</th><th rowspan="2">Mã NV</th><th rowspan="2">Họ và tên</th><th rowspan="2">Khoa / Bộ phận</th>
+        ${months.map(m => `<th colspan="3" class="grp">${esc(monthLabel(m))}</th>`).join('')}${months.length > 1 ? '<th colspan="3" class="grp">Cả kỳ</th>' : ''}<th rowspan="2" class="c">Tổng</th></tr>
+        <tr>${months.map(() => sub).join('')}${months.length > 1 ? sub : ''}</tr>
+      </thead><tbody>${body}${totalRow}</tbody></table>${pagerHtml}</div>`;
+  }
+
+  function renderDetail(rk) {
+    const list = detailData(rk);
+    const title = rk === 'count' ? 'Chi tiết các lượt bị tính' : 'Các lượt có đơn – không tính vào vi phạm';
+    if (!list.length) { $('attView').innerHTML = `<div class="sec-head"><h3>${title}</h3></div>` + empty('Không có lượt nào', 'Thử đổi tháng, loại vi phạm hoặc từ khoá tìm kiếm.'); return; }
+    const pagerHtml = pager(rk, list.length);
+    const start = (S.page[rk] - 1) * PS;
+    const body = pageSlice(rk, list).map((r, i) => `<tr><td class="c dim">${start + i + 1}</td><td class="date">${esc(monthLabel(r.month))}</td><td class="date">${esc(r.date)}</td>
+      <td class="mono">${esc(r.id)}</td><td class="who">${esc(r.name)}</td><td class="unit trunc" title="${esc(r.unit)}">${esc(r.unit)}</td><td>${pill(r)}</td>
+      <td class="c">${esc(r.tin) || '<span class="dim">—</span>'}</td><td class="c">${esc(r.tout) || '<span class="dim">—</span>'}</td>
+      <td class="num">${r.mins && r.tk !== 'forgot' ? `<strong>${esc(r.mins)}</strong>` : '<span class="dim">—</span>'}</td>
+      <td class="trunc dim" title="${esc(r.doc)}">${esc(r.doc) || '—'}</td></tr>`).join('');
+    $('attView').innerHTML = `<div class="sec-head"><h3>${title}</h3><span class="dim">${fmt(list.length)} lượt</span></div>
+      <div class="table-box"><table><thead><tr><th class="c">#</th><th>Tháng</th><th>Ngày</th><th>Mã NV</th><th>Họ và tên</th><th>Khoa / Bộ phận</th><th>Loại</th><th class="c">Giờ vào</th><th class="c">Giờ ra</th><th class="num">Phút</th><th>Đơn từ</th></tr></thead>
+      <tbody>${body}</tbody></table>${pagerHtml}</div>`;
+  }
+
+  // ---------- tables as rows (copy + Excel) ----------
+  const toNum = (v) => (/^-?\d+([.,]\d+)?$/.test(String(v).trim()) ? +String(v).replace(',', '.') : v);
+  function aoaMonths() {
+    return [['Tháng', 'Bị tính', 'Đi muộn', 'Về sớm', 'Quên chấm công', 'Nhân sự vi phạm', 'Có đơn – không tính'],
+      ...monthData().map(m => [monthLabel(m.m), m.total, m.late, m.early, m.forgot, m.people, m.free])];
+  }
+  function aoaUnits() {
+    return [['Khoa / Bộ phận', 'Bị tính', 'Đi muộn', 'Về sớm', 'Quên chấm công', 'Nhân sự'],
+      ...unitData().map(u => [u.unit, u.total, u.late, u.early, u.forgot, u.people])];
+  }
+  function aoaPeople(useQ) {
+    const list = peopleData(useQ), months = viewMonths().filter(m => list.some(e => e.c[m]));
+    const head = ['Mã NV', 'Họ và tên', 'Khoa / Bộ phận'];
+    months.forEach(m => TYPES.forEach(([, l]) => head.push(`${monthLabel(m)} – ${l}`)));
+    head.push('Tổng đi muộn', 'Tổng về sớm', 'Tổng quên chấm công', 'Tổng lượt');
+    return [head, ...list.map(e => [e.id, e.name, e.unit, ...months.flatMap(m => TYPES.map(([k]) => e.c[m]?.[k] || 0)), e.late, e.early, e.forgot, e.total])];
+  }
+  function aoaDetail(rk, useFilters) {
+    return [['Tháng', 'Ngày', 'Mã NV', 'Họ và tên', 'Khoa / Bộ phận', 'Loại vi phạm', 'Giờ vào', 'Giờ ra', 'Muộn/Sớm (phút)', 'Đơn từ liên quan', 'Kết quả'],
+      ...detailData(rk, useFilters).map(r => [monthLabel(r.month), r.date, r.id, r.name, r.unit, r.type, r.tin, r.tout, r.tk === 'forgot' ? '' : toNum(r.mins), r.doc, r.result])];
+  }
+
+  function copyTable() {
+    const aoa = S.tab === 'summary' ? [...aoaMonths(), [], ...aoaUnits()] : S.tab === 'people' ? aoaPeople(true) : aoaDetail(S.tab, true);
+    const text = aoa.map(r => r.map(v => String(v ?? '').replace(/[\t\n]+/g, ' ')).join('\t')).join('\n');
+    const done = () => toast(`Đã sao chép ${Math.max(0, aoa.length - 1)} dòng. Mở Excel và dán (Ctrl+V).`);
+    navigator.clipboard.writeText(text).then(done).catch(() => {
+      const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch { toast('Trình duyệt chặn sao chép. Hãy bôi đen bảng và nhấn Ctrl+C.'); }
+      ta.remove();
+    });
+  }
+
+  async function exportExcel() {
+    const wb = XLSX.utils.book_new();
+    const add = (aoa, name) => {
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = aoa[0].map((h, i) => ({ wch: Math.min(45, Math.max(String(h).length + 2, ...aoa.slice(1).map(r => String(r[i] ?? '').length + 2))) }));
+      if (aoa.length > 1) ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: aoa[0].length - 1 } }) };
+      XLSX.utils.book_append_sheet(wb, ws, name);
+    };
+    add(aoaMonths(), 'Tóm tắt theo tháng');
+    add(aoaUnits(), 'Theo khoa - bộ phận');
+    add(aoaPeople(false), 'Tổng hợp nhân sự');
+    add(aoaDetail('count', false), 'Chi tiết bị tính');
+    add(aoaDetail('free', false), 'Có đơn - không tính');
+    const tag = S.month === 'all' ? 'tat-ca' : (norm(S.month).replace(/[^\w-]+/g, '-') || 'thang');
+    await saveWorkbook(wb, `di-muon-ve-som-${tag}.xlsx`);
+  }
+
+  // ---------- wiring ----------
+  $('attPick').onclick = () => $('attFile').click();
+  $('attFile').onchange = (e) => { if (e.target.files[0]) load(e.target.files[0]); e.target.value = ''; };
+  $('attClear').onclick = clear;
+  $('attMonth').onchange = (e) => { S.month = e.target.value; S.page = { people: 1, count: 1, free: 1 }; render(); };
+  $('attType').onchange = (e) => { S.type = e.target.value; S.page.count = S.page.free = 1; render(); };
+  let qt; $('attQ').oninput = (e) => { clearTimeout(qt); qt = setTimeout(() => { S.q = fold(e.target.value); S.page = { people: 1, count: 1, free: 1 }; render(); }, 200); };
+  document.querySelector('#mod-att .tabs').onclick = (e) => { const b = e.target.closest('.tab'); if (!b) return; S.tab = b.dataset.tab; render(); };
+  $('attView').onclick = (e) => {
+    const b = e.target.closest('.pg'); if (!b || b.disabled) return;
+    S.page[S.tab] = +b.dataset.pg; render();
+    document.querySelector('#mod-att .tabs').scrollIntoView({ block: 'start' });
+  };
+  $('attCopy').onclick = copyTable;
+  $('attExport').onclick = exportExcel;
+  window.__att = { load, clear, S };
 })();
 </script>
 

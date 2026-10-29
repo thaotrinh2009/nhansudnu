@@ -17,6 +17,12 @@ Trang web đọc 3 file Excel xuất từ hệ thống nhân sự và trả ra, 
 
 File chỉ được đọc trong trình duyệt, không gửi lên máy chủ nào.
 
+## Tab Đi muộn – Về sớm
+
+Tải 1 file báo cáo chấm công có sheet **Dữ liệu gốc** (cột Tháng, Mã NV, Họ và tên, Khoa/Bộ phận, Loại vi phạm, Ngày, Giờ vào, Giờ ra, Muộn/Sớm (phút), Đơn từ liên quan, Kết quả).
+Trang hiện: tóm tắt theo tháng và theo khoa / bộ phận, tổng hợp theo nhân sự, chi tiết lượt **BỊ TÍNH** và các lượt có đơn **KHÔNG TÍNH**.
+Danh sách tháng lấy tự động từ file; có thể xuất Excel 5 sheet theo tháng đang chọn.
+
 ## Sử dụng
 
 Mở `index.html` bằng trình duyệt (cần mạng để tải font và thư viện SheetJS), nhập mật khẩu, kéo thả 3 file và chọn tháng.
