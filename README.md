@@ -32,7 +32,7 @@ Có 2 cách nạp dữ liệu (trang tự nhận diện file theo tiêu đề c�
 2. **Báo cáo đã xử lý**: 1 file có sheet **Dữ liệu gốc** (cột Tháng, Mã NV, Họ và tên, Khoa/Bộ phận, Loại vi phạm, Ngày, Giờ vào, Giờ ra, Muộn/Sớm (phút), Đơn từ liên quan, Kết quả).
 
 Trang hiện: tóm tắt theo tháng và theo khoa / bộ phận, tổng hợp theo nhân sự, chi tiết lượt **BỊ TÍNH** và các lượt có đơn **KHÔNG TÍNH**.
-Xuất Excel theo tháng đang chọn gồm 5 sheet báo cáo + sheet **Dữ liệu gốc** (tải lại file này vào tab là xem được ngay).
+Xuất Excel theo tháng đang chọn ra **1 sheet**: tóm tắt theo tháng, theo khoa / bộ phận, tổng hợp nhân sự, chi tiết bị tính, có đơn – không tính (tải lại file này vào tab là xem được ngay).
 
 ## Sử dụng
 

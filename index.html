@@ -283,7 +283,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
           <input type="search" id="attQ" placeholder="Tên, mã NV, khoa / bộ phận…">
         </div>
         <div class="field export">
-          <span class="label">Xuất Excel (theo tháng đang chọn)</span>
+          <span class="label">Xuất Excel (tháng đang chọn, 1 sheet)</span>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn ghost" id="attCopy" type="button">Sao chép bảng</button>
             <button class="btn" id="attExport" type="button">Xuất Excel</button>
@@ -835,7 +835,8 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     const rank = (n) => /goc|raw|data/.test(fold(n)) ? 1 : 0;
     for (const sn of [...wb.SheetNames].sort((a, b) => rank(b) - rank(a))) {
       const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: false, defval: '' });
-      const hi = aoa.slice(0, 15).findIndex(r => r.some(c => fold(c) === 'ket qua') && r.some(c => COLS.id.includes(fold(c))));
+      // Tìm dòng tiêu đề ở bất kỳ đâu trong sheet (file xuất 1 sheet có bảng chi tiết nằm phía dưới)
+      const hi = aoa.findIndex(r => r.some(c => fold(c) === 'ket qua') && r.some(c => COLS.id.includes(fold(c))));
       if (hi >= 0) return { aoa, hi };
     }
     return null;
@@ -1182,21 +1183,35 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   }
 
   async function exportExcel() {
+    // Một sheet duy nhất: các bảng xếp lần lượt từ trên xuống. Hai bảng chi tiết (có cột Kết quả) để cuối
+    // nên tải lại chính file này vào tab vẫn đọc được.
+    const period = S.month === 'all' ? 'Tất cả các tháng' : monthLabel(S.month);
+    const aoa = [['Báo cáo đi muộn – về sớm'], ['Kỳ báo cáo', period]];
+    const titleRows = [0];
+    const months = aoaMonths(), units = aoaUnits(), people = aoaPeople(false), count = aoaDetail('count', false), free = aoaDetail('free', false);
+    const sections = [
+      ['TÓM TẮT THEO THÁNG', months],
+      [`THEO KHOA / BỘ PHẬN (${fmt(units.length - 1)} đơn vị)`, units],
+      [`TỔNG HỢP THEO NHÂN SỰ (${fmt(people.length - 1)} nhân sự)`, people],
+      [`CHI TIẾT BỊ TÍNH (${fmt(count.length - 1)} lượt)`, count],
+      [`CÓ ĐƠN – KHÔNG TÍNH (${fmt(free.length - 1)} lượt)`, free],
+    ];
+    let width = 2;
+    sections.forEach(([title, t], i) => {
+      width = Math.max(width, t[0].length);
+      aoa.push([]);
+      titleRows.push(aoa.length);
+      aoa.push([`${i + 1}. ${title}`]);
+      aoa.push(...t);
+      if (t.length === 1) aoa.push(['Không có dữ liệu']);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!merges'] = titleRows.map(r => ({ s: { r, c: 0 }, e: { r, c: width - 1 } }));
+    ws['!cols'] = Array.from({ length: width }, (_, i) => ({
+      wch: Math.min(45, Math.max(10, ...aoa.filter((_, r) => !titleRows.includes(r)).map(row => String(row[i] ?? '').length + 2))),
+    }));
     const wb = XLSX.utils.book_new();
-    const add = (aoa, name) => {
-      const ws = XLSX.utils.aoa_to_sheet(aoa);
-      ws['!cols'] = aoa[0].map((h, i) => ({ wch: Math.min(45, Math.max(String(h).length + 2, ...aoa.slice(1).map(r => String(r[i] ?? '').length + 2))) }));
-      if (aoa.length > 1) ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: aoa[0].length - 1 } }) };
-      XLSX.utils.book_append_sheet(wb, ws, name);
-    };
-    add(aoaMonths(), 'Tóm tắt theo tháng');
-    add(aoaUnits(), 'Theo khoa - bộ phận');
-    add(aoaPeople(false), 'Tổng hợp nhân sự');
-    add(aoaDetail('count', false), 'Chi tiết bị tính');
-    add(aoaDetail('free', false), 'Có đơn - không tính');
-    // Toàn bộ lượt (bị tính + không tính) — tải lại file này vào tab là xem được ngay
-    add([['Tháng', 'Ngày', 'Mã NV', 'Họ và tên', 'Khoa/Bộ phận', 'Loại vi phạm', 'Giờ vào', 'Giờ ra', 'Muộn/Sớm (phút)', 'Đơn từ liên quan', 'Kết quả'],
-      ...S.rows.filter(inM).map(r => [r.month, r.date, r.id, r.name, r.unit, r.type, r.tin, r.tout, r.tk === 'forgot' ? '' : toNum(r.mins), r.doc, r.result])], 'Dữ liệu gốc');
+    XLSX.utils.book_append_sheet(wb, ws, 'Đi muộn – về sớm');
     const tag = S.month === 'all' ? 'tat-ca' : (norm(S.month).replace(/[^\w-]+/g, '-') || 'thang');
     await saveWorkbook(wb, `di-muon-ve-som-${tag}.xlsx`);
   }
