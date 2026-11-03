@@ -57,7 +57,7 @@ h1 { font-size: 22px; font-weight: 700; margin: 0; letter-spacing: -0.01em; text
 .field { display: grid; gap: 4px; }
 .field.export { margin-left: auto; }
 @media (max-width: 700px) { .field.export { margin-left: 0; } }
-select, input[type=search] { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px; }
+select, input[type=search], input[type=time], input[type=text] { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px; }
 input[type=search] { min-width: 0; width: 260px; max-width: 100%; }
 
 /* Tabs */
@@ -135,6 +135,13 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
 .pg[aria-current=page] { background: var(--accent); border-color: var(--accent); color: var(--surface); }
 .pg:disabled { opacity: .4; cursor: default; }
 @media (max-width: 600px) { .wrap { padding: 20px 16px 48px; } h1 { font-size: 19px; } }
+/* Thiết lập tính công từ vân tay */
+.cfg { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px 20px; align-items: end; padding-top: 12px; border-top: 1px solid var(--line); }
+.cfg .span2 { grid-column: span 2; }
+.cfg input[type=text] { width: 100%; }
+.check { display: flex; gap: 8px; align-items: center; font-size: 13.5px; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+@media (max-width: 600px) { .cfg .span2 { grid-column: auto; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
@@ -194,7 +201,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
         <input type="search" id="q" placeholder="Tên, mã nhân sự, đơn vị…">
       </div>
       <div class="field export">
-        <label class="label" for="exportScope">Xuất Excel (4 bảng)</label>
+        <label class="label" for="exportScope">Xuất Excel (4 bảng, 1 sheet)</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <select id="exportScope">
             <option value="month">Tháng đang chọn</option>
@@ -233,15 +240,25 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
       <div class="drop-head">
         <span class="label">Dữ liệu chấm công</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <input type="file" id="attFile" accept=".xlsx,.xls" hidden>
+          <input type="file" id="attFile" accept=".xlsx,.xls" multiple hidden>
           <button class="btn" id="attPick" type="button">Chọn file Excel</button>
           <button class="btn ghost" id="attClear" type="button" hidden>Xoá dữ liệu</button>
         </div>
       </div>
       <div class="slots">
-        <div class="slot" id="attSlot"><span class="name">Báo cáo đi muộn – về sớm</span><span class="file">File Excel có sheet “Dữ liệu gốc”</span></div>
+        <div class="slot" id="attSlotPunch"><span class="name">1. Dữ liệu vân tay</span><span class="file">vân tay T…xlsx (Mã nhân sự, Ngày, Giờ vào, Giờ ra)</span></div>
+        <div class="slot" id="attSlotOff"><span class="name">2. Đơn từ (Exported Timeoff)</span><span class="file">Exported.Timeoff…xls (Mã nhân sự, @tên nhóm, Ca đề xuất)</span></div>
+        <div class="slot" id="attSlot"><span class="name">Hoặc: báo cáo đã xử lý</span><span class="file">File Excel có sheet “Dữ liệu gốc” (cột Kết quả)</span></div>
       </div>
-      <div class="dim">Kéo thả file vào đây hoặc bấm “Chọn file Excel”. Cần các cột: Tháng, Mã NV, Họ và tên, Khoa/Bộ phận, Loại vi phạm, Ngày, Giờ vào, Giờ ra, Muộn/Sớm (phút), Đơn từ liên quan, Kết quả.</div>
+      <div class="dim">Kéo thả cùng lúc file vân tay và file đơn từ để trang tự tính, hoặc tải 1 file báo cáo đã có sheet “Dữ liệu gốc”. Trang tự nhận diện file theo tiêu đề cột.</div>
+      <div class="cfg" id="attCfg" hidden>
+        <div class="field"><label class="label" for="attCfgIn">Giờ vào chuẩn (muộn nếu sau)</label><input type="time" id="attCfgIn" value="08:00"></div>
+        <div class="field"><label class="label" for="attCfgOut">Giờ ra chuẩn (sớm nếu trước)</label><input type="time" id="attCfgOut" value="17:00"></div>
+        <label class="check"><input type="checkbox" id="attCfgSat" checked> Loại trừ Thứ 7</label>
+        <label class="check"><input type="checkbox" id="attCfgRej" checked> Tính cả đơn “Từ chối”, “Chờ duyệt” (chỉ bỏ đơn “Đã hủy”)</label>
+        <div class="field span2"><label class="label" for="attCfgHol">Ngày lễ loại trừ (dd/mm/yyyy, cách nhau dấu phẩy)</label><input type="text" id="attCfgHol" placeholder="VD: 30/04/2026, 01/05/2026"></div>
+      </div>
+      <div class="note" id="attWarn" hidden></div>
       <div class="err" id="attErr" hidden></div>
     </section>
 
@@ -266,7 +283,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
           <input type="search" id="attQ" placeholder="Tên, mã NV, khoa / bộ phận…">
         </div>
         <div class="field export">
-          <span class="label">Xuất Excel (theo tháng đang chọn)</span>
+          <span class="label">Xuất Excel (tháng đang chọn, 1 sheet)</span>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn ghost" id="attCopy" type="button">Sao chép bảng</button>
             <button class="btn" id="attExport" type="button">Xuất Excel</button>
@@ -639,27 +656,36 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   const toCell = (v) => (typeof v === 'string' && /^-?\d+$/.test(v) && v.length < 16) ? +v : v;
   const rowDate = (k, r) => k === 'contract' ? (r.sign || r.start) : r.date;
 
+  // Một sheet duy nhất: tổng hợp ở trên, sau đó 4 bảng xếp lần lượt từ trên xuống.
   function buildWorkbook(month) {
     const R = reports(month), all = month === '*';
-    const wb = XLSX.utils.book_new();
-    const summary = [['Báo cáo biến động nhân sự'], ['Kỳ báo cáo', all ? 'Tất cả các tháng' : mLabel(month)], [], ['Hạng mục', 'Số nhân sự']];
-    SHEETS.forEach(([k, name]) => summary.push([name, R[k].length]));
-    const ws0 = XLSX.utils.aoa_to_sheet(summary); ws0['!cols'] = [{ wch: 26 }, { wch: 20 }];
-    XLSX.utils.book_append_sheet(wb, ws0, 'Tổng hợp');
-    for (const [k, name] of SHEETS) {
+    const aoa = [['Báo cáo biến động nhân sự'], ['Kỳ báo cáo', all ? 'Tất cả các tháng' : mLabel(month)], [], ['Hạng mục', 'Số nhân sự']];
+    SHEETS.forEach(([k, name]) => aoa.push([name, R[k].length]));
+    const titleRows = [0];
+    let width = 2;
+    SHEETS.forEach(([k, name], idx) => {
       const cols = COLS[k]().filter(c => !(c[0] === 'Ngày ký' && !state.contract?.hasSign));
       const head = cols.flatMap(c => (c[4] || c[0]).split('\t'));
       const body = R[k].map(r => cols.flatMap(c => String(c[2](r) ?? '').split('\t').map(s => { s = s.replace(/\s+/g, ' ').trim(); return c[3] === 'num' ? toCell(s) : s; })));
       if (all) { head.unshift('Tháng'); body.forEach((row, i) => row.unshift(mLabel(mKey(rowDate(k, R[k][i]))))); }
-      const ws = XLSX.utils.aoa_to_sheet([head, ...body]);
-      ws['!cols'] = head.map((h, i) => ({ wch: Math.min(48, Math.max(h.length + 2, ...body.map(r => String(r[i] ?? '').length + 2))) }));
-      ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: body.length, c: head.length - 1 } }) };
-      for (let r = 1; r <= body.length; r++) for (let c = 0; c < head.length; c++) {
-        const cell = ws[XLSX.utils.encode_cell({ r, c })];
-        if (cell && cell.t === 'n' && cell.v >= 100000) cell.z = '#,##0';
-      }
-      XLSX.utils.book_append_sheet(wb, ws, name);
+      width = Math.max(width, head.length);
+      aoa.push([]);
+      titleRows.push(aoa.length);
+      aoa.push([`${idx + 1}. ${name.toUpperCase()} (${R[k].length} nhân sự)`]);
+      aoa.push(head);
+      if (body.length) aoa.push(...body); else aoa.push(['Không có nhân sự trong kỳ']);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!merges'] = titleRows.map(r => ({ s: { r, c: 0 }, e: { r, c: width - 1 } }));
+    ws['!cols'] = Array.from({ length: width }, (_, i) => ({
+      wch: Math.min(48, Math.max(12, ...aoa.filter((_, r) => !titleRows.includes(r)).map(row => String(row[i] ?? '').length + 2))),
+    }));
+    for (let r = 0; r < aoa.length; r++) for (let c = 0; c < width; c++) {
+      const cell = ws[XLSX.utils.encode_cell({ r, c })];
+      if (cell && cell.t === 'n' && cell.v >= 100000) cell.z = '#,##0';
     }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Biến động nhân sự');
     return wb;
   }
 
@@ -700,7 +726,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   let mod = 'hr';
   const MOD_TEXT = {
     hr: ['Biến động nhân sự theo tháng', 'Tải lên 3 file xuất từ hệ thống (Hợp đồng, Quyết định thôi việc, Sự nghiệp), chọn tháng để xem ai ký hợp đồng, tăng lương, được bổ nhiệm và nghỉ việc. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.'],
-    att: ['Chấm công: đi muộn, về sớm', 'Tải lên file báo cáo chấm công (sheet “Dữ liệu gốc”) để xem số lượt đi muộn, về sớm, quên chấm công theo tháng, theo đơn vị và theo từng nhân sự. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.'],
+    att: ['Chấm công: đi muộn, về sớm', 'Tải lên file vân tay và file đơn từ (Exported Timeoff) để trang tự tính, hoặc tải file báo cáo đã xử lý (sheet “Dữ liệu gốc”), rồi xem số lượt đi muộn, về sớm, quên chấm công theo tháng, theo đơn vị và theo từng nhân sự. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.'],
   };
   function setModule(m) {
     mod = m;
@@ -716,7 +742,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     if ($('app').hidden) return;
     const f = [...(e.dataTransfer?.files || [])];
     if (!f.length) return;
-    if (mod === 'att') window.__att?.load(f[0]); else handleFiles(f);
+    if (mod === 'att') window.__att?.load(f); else handleFiles(f);
   });
   $('monthSel').onchange = (e) => { state.month = e.target.value; state.chip = 'all'; render(); };
   $('q').oninput = render;
@@ -782,19 +808,49 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
 
   const S = { rows: [], months: [], file: '', month: 'all', type: 'all', q: '', tab: 'summary', page: { people: 1, count: 1, free: 1 } };
 
-  // ---------- load ----------
-  async function load(file) {
+  // ---------- load: nhận diện từng file (báo cáo đã xử lý / vân tay / đơn từ) ----------
+  async function load(input) {
+    const files = Array.isArray(input) ? input : [input];
     $('attErr').hidden = true;
+    let current = '';
     try {
-      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
-      const rank = (n) => /goc|raw|data/.test(fold(n)) ? 1 : 0;
-      let found = null;
-      for (const sn of [...wb.SheetNames].sort((a, b) => rank(b) - rank(a))) {
-        const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: false, defval: '' });
-        const hi = aoa.slice(0, 15).findIndex(r => r.some(c => fold(c) === 'ket qua') && r.some(c => COLS.id.includes(fold(c))));
-        if (hi >= 0) { found = { aoa, hi }; break; }
+      for (const file of files) {
+        current = file.name;
+        const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+        const report = findReport(wb);
+        if (report) { loadReport(report, file.name); continue; }
+        const raw = sniffRaw(wb);
+        if (!raw) throw new Error(`Không nhận ra “${file.name}”. Cần file vân tay (cột Giờ vào, Giờ ra), file đơn từ (cột Ca đề xuất) hoặc file báo cáo có sheet “Dữ liệu gốc” (cột Mã NV, Loại vi phạm, Kết quả).`);
+        if (raw.kind === 'punch') { R.punch = parsePunch(raw); R.punchName = file.name; }
+        else { R.off = parseOff(raw); R.offName = file.name; }
       }
-      if (!found) throw new Error(`Không tìm thấy bảng dữ liệu trong “${file.name}”. File cần có sheet “Dữ liệu gốc” với các cột Mã NV, Loại vi phạm và Kết quả.`);
+      if (R.punch) runRaw();
+      else if (R.off && !S.rows.length) rawSlots();
+    } catch (e) {
+      $('attErr').textContent = e?.message || `Không đọc được “${current}”. Hãy kiểm tra đây là file Excel (.xlsx, .xls).`;
+      $('attErr').hidden = false;
+    }
+  }
+  function findReport(wb) {
+    const rank = (n) => /goc|raw|data/.test(fold(n)) ? 1 : 0;
+    for (const sn of [...wb.SheetNames].sort((a, b) => rank(b) - rank(a))) {
+      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: false, defval: '' });
+      // Tìm dòng tiêu đề ở bất kỳ đâu trong sheet (file xuất 1 sheet có bảng chi tiết nằm phía dưới)
+      const hi = aoa.findIndex(r => r.some(c => fold(c) === 'ket qua') && r.some(c => COLS.id.includes(fold(c))));
+      if (hi >= 0) return { aoa, hi };
+    }
+    return null;
+  }
+  function setRows(rows, label) {
+    Object.assign(S, { rows, file: label, month: 'all', type: 'all', q: '', page: { people: 1, count: 1, free: 1 } });
+    S.months = [...new Set(rows.map(r => r.month))].sort((a, b) => monthOrder(a) - monthOrder(b) || a.localeCompare(b));
+    $('attMonth').innerHTML = '<option value="all">Tất cả các tháng</option>' + S.months.map(m => `<option value="${esc(m)}">${esc(monthLabel(m))}</option>`).join('');
+    $('attMonth').value = 'all'; $('attType').value = 'all'; $('attQ').value = '';
+    $('attReport').hidden = false; $('attWelcome').hidden = true; $('attClear').hidden = false;
+    render();
+  }
+  function loadReport(found, fileName) {
+    {
       const head = found.aoa[found.hi].map(fold);
       const idx = {};
       for (const [k, names] of Object.entries(COLS)) {
@@ -809,23 +865,158 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
         o.tk = typeKey(o.type); o.rk = resKey(o.result);
         return o;
       }).filter(o => (o.id || o.name) && o.rk);
-      if (!rows.length) throw new Error(`“${file.name}” không có dòng nào có Kết quả là “BỊ TÍNH” hoặc “KHÔNG TÍNH”.`);
-      Object.assign(S, { rows, file: file.name, month: 'all', type: 'all', q: '', page: { people: 1, count: 1, free: 1 } });
-      S.months = [...new Set(rows.map(r => r.month))].sort((a, b) => monthOrder(a) - monthOrder(b) || a.localeCompare(b));
-      $('attMonth').innerHTML = '<option value="all">Tất cả các tháng</option>' + S.months.map(m => `<option value="${esc(m)}">${esc(monthLabel(m))}</option>`).join('');
-      $('attMonth').value = 'all'; $('attType').value = 'all'; $('attQ').value = '';
-      $('attSlot').classList.add('ok'); $('attSlot').querySelector('.file').textContent = '✓ ' + file.name;
-      $('attReport').hidden = false; $('attWelcome').hidden = true; $('attClear').hidden = false;
-      render();
-    } catch (e) {
-      $('attErr').textContent = e?.message || `Không đọc được “${file.name}”. Hãy kiểm tra đây là file Excel (.xlsx).`;
-      $('attErr').hidden = false;
+      if (!rows.length) throw new Error(`“${fileName}” không có dòng nào có Kết quả là “BỊ TÍNH” hoặc “KHÔNG TÍNH”.`);
+      Object.assign(R, { punch: null, off: null, punchName: '', offName: '' });
+      resetRawSlots(); $('attCfg').hidden = true; $('attWarn').hidden = true;
+      $('attSlot').classList.add('ok'); $('attSlot').querySelector('.file').textContent = '✓ ' + fileName;
+      setRows(rows, fileName);
     }
   }
   function clear() {
     Object.assign(S, { rows: [], months: [], file: '' });
-    $('attSlot').classList.remove('ok'); $('attSlot').querySelector('.file').textContent = 'File Excel có sheet “Dữ liệu gốc”';
+    Object.assign(R, { punch: null, off: null, punchName: '', offName: '' });
+    $('attSlot').classList.remove('ok'); $('attSlot').querySelector('.file').textContent = 'File Excel có sheet “Dữ liệu gốc” (cột Kết quả)';
+    resetRawSlots(); $('attCfg').hidden = true; $('attWarn').hidden = true;
     $('attReport').hidden = true; $('attWelcome').hidden = false; $('attClear').hidden = true; $('attErr').hidden = true;
+  }
+
+  // ---------- tính từ dữ liệu vân tay + đơn từ ----------
+  // Quy tắc (theo báo cáo mẫu của phòng Nhân sự):
+  //  • Đi muộn: giờ vào > giờ vào chuẩn. Về sớm: giờ ra < giờ ra chuẩn (chỉ khi có giờ ra). Ngày chỉ chấm 1 lần → lần chấm là giờ vào.
+  //  • Quên chấm công: ngày làm việc không có lần chấm nào; chỉ xét nhân sự đã chấm ít nhất 1 lần trong file.
+  //  • Bỏ Chủ nhật, Thứ 7 (tuỳ chọn) và ngày lễ nhập tay.
+  //  • Bị tính: không có đơn, hoặc chỉ có đơn “Giải trình đi muộn về sớm”. Không tính: trùng ngày với đơn khác (nghỉ phép, làm ngoài VP…).
+  const R = { punch: null, off: null, punchName: '', offName: '' };
+  const pad = (n) => String(n).padStart(2, '0');
+  const dkey = (d) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  const mkey = (d) => `T${d.getMonth() + 1}-${d.getFullYear()}`;
+  const hm = (m) => m == null ? '' : `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+  const PUNCH_HINT = 'vân tay T…xlsx (Mã nhân sự, Ngày, Giờ vào, Giờ ra)', OFF_HINT = 'Exported.Timeoff…xls (Mã nhân sự, @tên nhóm, Ca đề xuất)';
+  function toDate(v) {
+    if (v instanceof Date) return new Date(v.getFullYear(), v.getMonth(), v.getDate());
+    if (typeof v === 'number') { const d = XLSX.SSF.parse_date_code(v); return d ? new Date(d.y, d.m - 1, d.d) : null; }
+    const m = norm(v).match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+    return m ? new Date(+m[3], +m[2] - 1, +m[1]) : null;
+  }
+  function toMin(v) {
+    if (v == null || v === '') return null;
+    if (v instanceof Date) return v.getHours() * 60 + v.getMinutes();
+    if (typeof v === 'number') return Math.round((v % 1) * 1440) % 1440;
+    const m = norm(v).match(/(\d{1,2}):(\d{2})/);
+    return m ? +m[1] * 60 + +m[2] : null;
+  }
+  const colIdx = (head, names) => head.findIndex(c => names.includes(fold(c)));
+  function sniffRaw(wb) {
+    for (const sn of wb.SheetNames) {
+      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: '' });
+      const has = (keys) => aoa.slice(0, 20).findIndex(r => keys.every(k => r.some(c => fold(c) === k)));
+      let hi = has(['ca de xuat']);
+      if (hi >= 0) return { kind: 'off', aoa, hi };
+      hi = has(['gio vao', 'gio ra']);
+      if (hi >= 0) return { kind: 'punch', aoa, hi };
+    }
+    return null;
+  }
+  function parsePunch({ aoa, hi }) {
+    const h = aoa[hi];
+    const ix = { id: colIdx(h, ['ma nhan su', 'ma nv', 'ma nhan vien']), name: colIdx(h, ['ten', 'ho va ten', 'ho ten', 'ten nhan su']),
+      unit: colIdx(h, ['khu vuc chuyen mon', 'khoa/bo phan', 'bo phan', 'don vi', 'phong ban']),
+      date: colIdx(h, ['ngay']), tin: colIdx(h, ['gio vao']), tout: colIdx(h, ['gio ra']), all: colIdx(h, ['tat ca du lieu']) };
+    if (ix.id < 0 || ix.date < 0) throw new Error('File vân tay thiếu cột “Mã nhân sự” hoặc “Ngày”.');
+    const rows = [];
+    for (const r of aoa.slice(hi + 1)) {
+      const id = norm(r[ix.id]), d = toDate(r[ix.date]);
+      if (!id || !d) continue;
+      let tin = toMin(r[ix.tin]), tout = toMin(r[ix.tout]);
+      if (tin == null && tout != null) { tin = tout; tout = null; }
+      if (tin != null && tout === tin && ix.all >= 0 && !norm(r[ix.all]).includes('-')) tout = null;
+      rows.push({ id, name: norm(r[ix.name]), unit: norm(r[ix.unit]), d, tin, tout });
+    }
+    if (!rows.length) throw new Error('File vân tay không có dòng dữ liệu nào.');
+    return rows;
+  }
+  function parseOff({ aoa, hi }) {
+    const h = aoa[hi];
+    const ix = { id: colIdx(h, ['ma nhan su', 'ma nv']), type: colIdx(h, ['@ten nhom', 'ten nhom', 'loai de xuat']),
+      title: colIdx(h, ['ten de xuat']), shift: colIdx(h, ['ca de xuat']), status: colIdx(h, ['trang thai']) };
+    if (ix.id < 0 || ix.shift < 0) throw new Error('File đơn từ thiếu cột “Mã nhân sự” hoặc “Ca đề xuất”.');
+    const list = [];
+    for (const r of aoa.slice(hi + 1)) {
+      const id = norm(r[ix.id]); if (!id) continue;
+      const shift = norm(r[ix.shift]);
+      const dates = new Set();
+      // "17/10/2026 [08:00-12:00]", nhiều ngày cách dấu phẩy, hoặc khoảng "01/10/2026 - 03/10/2026"
+      const rng = shift.match(/(\d{1,2}\/\d{1,2}\/\d{4})\s*(?:-|→|đến)\s*(\d{1,2}\/\d{1,2}\/\d{4})/);
+      if (rng) { let a = toDate(rng[1]); const b = toDate(rng[2]); for (let i = 0; a <= b && i < 400; i++) { dates.add(dkey(a)); a = new Date(a.getFullYear(), a.getMonth(), a.getDate() + 1); } }
+      for (const m of shift.matchAll(/\d{1,2}\/\d{1,2}\/\d{4}/g)) dates.add(dkey(toDate(m[0])));
+      list.push({ id, type: norm(r[ix.type >= 0 ? ix.type : ix.title]) || 'Đơn từ', status: norm(r[ix.status]), dates: [...dates] });
+    }
+    return list;
+  }
+  function computeRaw() {
+    const cfgIn = toMin($('attCfgIn').value) ?? 480, cfgOut = toMin($('attCfgOut').value) ?? 1020;
+    const exSat = $('attCfgSat').checked, keepRej = $('attCfgRej').checked;
+    const hol = new Set([...$('attCfgHol').value.matchAll(/\d{1,2}\/\d{1,2}\/\d{4}/g)].map(m => dkey(toDate(m[0]))));
+    const offMap = new Map();
+    for (const o of R.off || []) {
+      const st = fold(o.status);
+      if (st.includes('huy')) continue;
+      if (!keepRej && (st.includes('tu choi') || st.includes('cho duyet'))) continue;
+      const explain = fold(o.type).includes('giai trinh di muon ve som');
+      for (const dk of o.dates) {
+        const k = o.id + '|' + dk, v = offMap.get(k) || { explain: false, others: new Set() };
+        if (explain) v.explain = true; else v.others.add(o.type);
+        offMap.set(k, v);
+      }
+    }
+    const allDates = new Map();
+    R.punch.forEach(r => allDates.set(dkey(r.d), r.d));
+    const workDays = [...allDates.values()].filter(d => d.getDay() !== 0 && !(exSat && d.getDay() === 6) && !hol.has(dkey(d))).sort((a, b) => a - b);
+    const people = new Map();
+    for (const r of R.punch) {
+      let p = people.get(r.id);
+      if (!p) { p = { id: r.id, name: r.name, unit: r.unit, used: false, days: new Map() }; people.set(r.id, p); }
+      if (r.tin != null) p.used = true;
+      const k = dkey(r.d), cur = p.days.get(k);
+      if (!cur || (cur.tin == null && r.tin != null)) p.days.set(k, r);
+    }
+    const users = [...people.values()].filter(p => p.used).sort((a, b) => a.unit.localeCompare(b.unit, 'vi') || a.name.localeCompare(b.name, 'vi'));
+    const rows = [];
+    for (const d of workDays) for (const p of users) {
+      const dk = dkey(d), r = p.days.get(dk), tin = r ? r.tin : null, tout = r ? r.tout : null;
+      const v = [];
+      if (tin == null && tout == null) v.push(['forgot', null]);
+      else { if (tin != null && tin > cfgIn) v.push(['late', tin - cfgIn]); if (tout != null && tout < cfgOut) v.push(['early', cfgOut - tout]); }
+      if (!v.length) continue;
+      const o = offMap.get(p.id + '|' + dk);
+      let doc = 'Không có đơn', result = 'Bị tính';
+      if (o && o.others.size) { doc = 'Có đơn: ' + [...o.others].join(', '); result = 'Không tính'; }
+      else if (o && o.explain) doc = 'Có đơn giải trình đi muộn về sớm';
+      for (const [tk, mins] of v) rows.push({ month: mkey(d), date: dk, id: p.id, name: p.name, unit: p.unit, type: TYPE_LABEL[tk], tk,
+        tin: hm(tin), tout: hm(tout), mins: mins == null ? '' : String(mins), doc, result, rk: result === 'Bị tính' ? 'count' : 'free' });
+    }
+    return { rows, users: users.length, days: workDays.length };
+  }
+  function resetRawSlots() {
+    $('attSlotPunch').classList.remove('ok'); $('attSlotPunch').querySelector('.file').textContent = PUNCH_HINT;
+    $('attSlotOff').classList.remove('ok'); $('attSlotOff').querySelector('.file').textContent = OFF_HINT;
+  }
+  function rawSlots() {
+    if (R.punch) { $('attSlotPunch').classList.add('ok'); $('attSlotPunch').querySelector('.file').textContent = `✓ ${R.punchName} · ${fmt(R.punch.length)} dòng`; }
+    if (R.off) { $('attSlotOff').classList.add('ok'); $('attSlotOff').querySelector('.file').textContent = `✓ ${R.offName} · ${fmt(R.off.length)} đơn`; }
+    $('attSlot').classList.remove('ok'); $('attSlot').querySelector('.file').textContent = 'File Excel có sheet “Dữ liệu gốc” (cột Kết quả)';
+    $('attCfg').hidden = false; $('attClear').hidden = false;
+    const w = $('attWarn');
+    if (R.punch && !R.off) { w.textContent = 'Chưa có file đơn từ: mọi vi phạm đang được tính là BỊ TÍNH. Tải thêm file Exported Timeoff để đối chiếu đơn.'; w.hidden = false; }
+    else if (!R.punch) { w.textContent = 'Đã nhận file đơn từ. Tải thêm file vân tay để bắt đầu tính.'; w.hidden = false; }
+    else w.hidden = true;
+  }
+  function runRaw() {
+    rawSlots();
+    const res = computeRaw();
+    if (!res.rows.length) { S.rows = []; $('attReport').hidden = true; $('attWelcome').hidden = false; toast('Không có lượt vi phạm nào trong dữ liệu vân tay.'); return; }
+    setRows(res.rows, R.punchName);
+    toast(`Đã tính ${fmt(res.users)} nhân sự dùng máy chấm công · ${fmt(res.days)} ngày làm việc`);
   }
 
   // ---------- data ----------
@@ -992,25 +1183,43 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   }
 
   async function exportExcel() {
+    // Một sheet duy nhất: các bảng xếp lần lượt từ trên xuống. Hai bảng chi tiết (có cột Kết quả) để cuối
+    // nên tải lại chính file này vào tab vẫn đọc được.
+    const period = S.month === 'all' ? 'Tất cả các tháng' : monthLabel(S.month);
+    const aoa = [['Báo cáo đi muộn – về sớm'], ['Kỳ báo cáo', period]];
+    const titleRows = [0];
+    const months = aoaMonths(), units = aoaUnits(), people = aoaPeople(false), count = aoaDetail('count', false), free = aoaDetail('free', false);
+    const sections = [
+      ['TÓM TẮT THEO THÁNG', months],
+      [`THEO KHOA / BỘ PHẬN (${fmt(units.length - 1)} đơn vị)`, units],
+      [`TỔNG HỢP THEO NHÂN SỰ (${fmt(people.length - 1)} nhân sự)`, people],
+      [`CHI TIẾT BỊ TÍNH (${fmt(count.length - 1)} lượt)`, count],
+      [`CÓ ĐƠN – KHÔNG TÍNH (${fmt(free.length - 1)} lượt)`, free],
+    ];
+    let width = 2;
+    sections.forEach(([title, t], i) => {
+      width = Math.max(width, t[0].length);
+      aoa.push([]);
+      titleRows.push(aoa.length);
+      aoa.push([`${i + 1}. ${title}`]);
+      aoa.push(...t);
+      if (t.length === 1) aoa.push(['Không có dữ liệu']);
+    });
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!merges'] = titleRows.map(r => ({ s: { r, c: 0 }, e: { r, c: width - 1 } }));
+    ws['!cols'] = Array.from({ length: width }, (_, i) => ({
+      wch: Math.min(45, Math.max(10, ...aoa.filter((_, r) => !titleRows.includes(r)).map(row => String(row[i] ?? '').length + 2))),
+    }));
     const wb = XLSX.utils.book_new();
-    const add = (aoa, name) => {
-      const ws = XLSX.utils.aoa_to_sheet(aoa);
-      ws['!cols'] = aoa[0].map((h, i) => ({ wch: Math.min(45, Math.max(String(h).length + 2, ...aoa.slice(1).map(r => String(r[i] ?? '').length + 2))) }));
-      if (aoa.length > 1) ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: aoa.length - 1, c: aoa[0].length - 1 } }) };
-      XLSX.utils.book_append_sheet(wb, ws, name);
-    };
-    add(aoaMonths(), 'Tóm tắt theo tháng');
-    add(aoaUnits(), 'Theo khoa - bộ phận');
-    add(aoaPeople(false), 'Tổng hợp nhân sự');
-    add(aoaDetail('count', false), 'Chi tiết bị tính');
-    add(aoaDetail('free', false), 'Có đơn - không tính');
+    XLSX.utils.book_append_sheet(wb, ws, 'Đi muộn – về sớm');
     const tag = S.month === 'all' ? 'tat-ca' : (norm(S.month).replace(/[^\w-]+/g, '-') || 'thang');
     await saveWorkbook(wb, `di-muon-ve-som-${tag}.xlsx`);
   }
 
   // ---------- wiring ----------
   $('attPick').onclick = () => $('attFile').click();
-  $('attFile').onchange = (e) => { if (e.target.files[0]) load(e.target.files[0]); e.target.value = ''; };
+  $('attFile').onchange = (e) => { if (e.target.files.length) load([...e.target.files]); e.target.value = ''; };
+  ['attCfgIn', 'attCfgOut', 'attCfgSat', 'attCfgRej', 'attCfgHol'].forEach(id => $(id).addEventListener('change', () => { if (R.punch) runRaw(); }));
   $('attClear').onclick = clear;
   $('attMonth').onchange = (e) => { S.month = e.target.value; S.page = { people: 1, count: 1, free: 1 }; render(); };
   $('attType').onchange = (e) => { S.type = e.target.value; S.page.count = S.page.free = 1; render(); };

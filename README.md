@@ -17,11 +17,22 @@ Trang web đọc 3 file Excel xuất từ hệ thống nhân sự và trả ra, 
 
 File chỉ được đọc trong trình duyệt, không gửi lên máy chủ nào.
 
+Xuất Excel ra **1 sheet** “Biến động nhân sự”: bảng tổng hợp ở trên, sau đó 4 bảng (Ký hợp đồng, Tăng lương, Bổ nhiệm, Nghỉ việc) xếp lần lượt.
+
 ## Tab Đi muộn – Về sớm
 
-Tải 1 file báo cáo chấm công có sheet **Dữ liệu gốc** (cột Tháng, Mã NV, Họ và tên, Khoa/Bộ phận, Loại vi phạm, Ngày, Giờ vào, Giờ ra, Muộn/Sớm (phút), Đơn từ liên quan, Kết quả).
+Có 2 cách nạp dữ liệu (trang tự nhận diện file theo tiêu đề cột):
+
+1. **Tính từ dữ liệu gốc**: kéo thả cùng lúc file **vân tay** (cột Mã nhân sự, Ngày, Giờ vào, Giờ ra) và file **đơn từ** `Exported.Timeoff…xls` (cột Mã nhân sự, @tên nhóm, Ca đề xuất, Trạng thái).
+   - Đi muộn: giờ vào sau 08:00. Về sớm: giờ ra trước 17:00 (chỉ khi có giờ ra). Ngày chỉ chấm 1 lần: lần chấm được coi là giờ vào.
+   - Quên chấm công: ngày làm việc không có lần chấm nào; chỉ xét nhân sự đã chấm ít nhất 1 lần trong file.
+   - Bỏ Chủ nhật, Thứ 7 và các ngày lễ nhập tay.
+   - **Bị tính**: không có đơn, hoặc chỉ có đơn “Giải trình đi muộn về sớm”. **Không tính**: trùng ngày với đơn khác (nghỉ phép, làm việc ngoài văn phòng…). Đơn “Đã hủy” bị bỏ qua.
+   - Giờ chuẩn, Thứ 7, ngày lễ và trạng thái đơn chỉnh được ngay trên trang.
+2. **Báo cáo đã xử lý**: 1 file có sheet **Dữ liệu gốc** (cột Tháng, Mã NV, Họ và tên, Khoa/Bộ phận, Loại vi phạm, Ngày, Giờ vào, Giờ ra, Muộn/Sớm (phút), Đơn từ liên quan, Kết quả).
+
 Trang hiện: tóm tắt theo tháng và theo khoa / bộ phận, tổng hợp theo nhân sự, chi tiết lượt **BỊ TÍNH** và các lượt có đơn **KHÔNG TÍNH**.
-Danh sách tháng lấy tự động từ file; có thể xuất Excel 5 sheet theo tháng đang chọn.
+Xuất Excel theo tháng đang chọn ra **1 sheet**: tóm tắt theo tháng, theo khoa / bộ phận, tổng hợp nhân sự, chi tiết bị tính, có đơn – không tính (tải lại file này vào tab là xem được ngay).
 
 ## Sử dụng
 
