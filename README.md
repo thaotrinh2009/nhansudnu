@@ -34,9 +34,13 @@ Có 2 cách nạp dữ liệu (trang tự nhận diện file theo tiêu đề c�
 Trang hiện: tóm tắt theo tháng và theo khoa / bộ phận, tổng hợp theo nhân sự, chi tiết lượt **BỊ TÍNH** và các lượt có đơn **KHÔNG TÍNH**.
 Xuất Excel theo tháng đang chọn ra **1 sheet**: tóm tắt theo tháng, theo khoa / bộ phận, tổng hợp nhân sự, chi tiết bị tính, có đơn – không tính (tải lại file này vào tab là xem được ngay).
 
+## Định dạng file Excel xuất ra
+
+Cả 2 tab xuất cùng một kiểu: tiêu đề lớn, khối Kỳ báo cáo / Ngày xuất, mỗi bảng có thanh tiêu đề mục màu xanh nhạt, dòng tiêu đề cột nền xanh chữ trắng, viền mảnh, dòng xen kẽ màu, số tiền có dấu phân cách hàng nghìn, chữ dài tự xuống dòng. Bảng Biến động nhân sự có thêm cột STT. Cột Kết quả (đi muộn – về sớm) tô đỏ BỊ TÍNH / xanh KHÔNG TÍNH. Nội dung ô không đổi nên file xuất ra vẫn tải lại vào tab Đi muộn – Về sớm được.
+
 ## Sử dụng
 
-Mở `index.html` bằng trình duyệt (cần mạng để tải font và thư viện SheetJS), nhập mật khẩu, kéo thả 3 file và chọn tháng.
+Mở `index.html` bằng trình duyệt (cần mạng để tải font và thư viện xlsx-js-style – bản SheetJS có hỗ trợ định dạng ô), nhập mật khẩu, kéo thả 3 file và chọn tháng.
 Có thể xuất toàn bộ 4 bảng ra Excel (theo tháng đang chọn hoặc tất cả các tháng).
 
 ## Đổi mật khẩu

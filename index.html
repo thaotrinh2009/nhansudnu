@@ -309,7 +309,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
 </div>
 <div class="toast" id="toast" hidden></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 <script>
 (() => {
   // ---------- helpers ----------
@@ -659,34 +659,108 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   // Một sheet duy nhất: tổng hợp ở trên, sau đó 4 bảng xếp lần lượt từ trên xuống.
   function buildWorkbook(month) {
     const R = reports(month), all = month === '*';
-    const aoa = [['Báo cáo biến động nhân sự'], ['Kỳ báo cáo', all ? 'Tất cả các tháng' : mLabel(month)], [], ['Hạng mục', 'Số nhân sự']];
-    SHEETS.forEach(([k, name]) => aoa.push([name, R[k].length]));
-    const titleRows = [0];
-    let width = 2;
+    const sections = [{ title: 'TỔNG QUAN', table: [['Hạng mục', 'Số nhân sự'], ...SHEETS.map(([k, name]) => [name, R[k].length])] }];
     SHEETS.forEach(([k, name], idx) => {
       const cols = COLS[k]().filter(c => !(c[0] === 'Ngày ký' && !state.contract?.hasSign));
       const head = cols.flatMap(c => (c[4] || c[0]).split('\t'));
       const body = R[k].map(r => cols.flatMap(c => String(c[2](r) ?? '').split('\t').map(s => { s = s.replace(/\s+/g, ' ').trim(); return c[3] === 'num' ? toCell(s) : s; })));
       if (all) { head.unshift('Tháng'); body.forEach((row, i) => row.unshift(mLabel(mKey(rowDate(k, R[k][i]))))); }
-      width = Math.max(width, head.length);
-      aoa.push([]);
-      titleRows.push(aoa.length);
-      aoa.push([`${idx + 1}. ${name.toUpperCase()} (${R[k].length} nhân sự)`]);
-      aoa.push(head);
-      if (body.length) aoa.push(...body); else aoa.push(['Không có nhân sự trong kỳ']);
+      head.unshift('STT'); body.forEach((row, i) => row.unshift(i + 1));
+      sections.push({ title: `${idx + 1}. ${name.toUpperCase()} (${R[k].length} nhân sự)`, table: [head, ...body], empty: 'Không có nhân sự trong kỳ' });
     });
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!merges'] = titleRows.map(r => ({ s: { r, c: 0 }, e: { r, c: width - 1 } }));
-    ws['!cols'] = Array.from({ length: width }, (_, i) => ({
-      wch: Math.min(48, Math.max(12, ...aoa.filter((_, r) => !titleRows.includes(r)).map(row => String(row[i] ?? '').length + 2))),
-    }));
-    for (let r = 0; r < aoa.length; r++) for (let c = 0; c < width; c++) {
-      const cell = ws[XLSX.utils.encode_cell({ r, c })];
-      if (cell && cell.t === 'n' && cell.v >= 100000) cell.z = '#,##0';
-    }
+    const ws = styledSheet({
+      title: 'BÁO CÁO BIẾN ĐỘNG NHÂN SỰ',
+      meta: [['Kỳ báo cáo', all ? 'Tất cả các tháng' : mLabel(month)], ['Ngày xuất', new Date().toLocaleDateString('vi-VN')]],
+      sections,
+    });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Biến động nhân sự');
     return wb;
+  }
+
+  // ---------- Excel styling (xlsx-js-style): tiêu đề, khối thông tin, bảng có viền, header màu ----------
+  // blocks: { title, meta: [[nhãn, giá trị]], sections: [{ title, table: [header, ...rows], empty }] }
+  // Trả về worksheet đã định dạng. Nội dung ô giữ nguyên như bản cũ (chỉ thêm định dạng) để đọc lại được.
+  function styledSheet({ title, meta = [], sections = [] }) {
+    const C = { accent: '0F6B62', soft: 'E2F0EE', ink: '15201F', muted: '5D6B69', line: 'C9D3D1', zebra: 'F6F9F8', red: 'B2402B', green: '1D7A3E' };
+    const FONT = 'Arial';
+    const border = { top: { style: 'thin', color: { rgb: C.line } }, bottom: { style: 'thin', color: { rgb: C.line } }, left: { style: 'thin', color: { rgb: C.line } }, right: { style: 'thin', color: { rgb: C.line } } };
+    const aoa = [], kinds = [], heights = [];
+    const spans = []; // số cột của bảng chứa dòng này
+    const push = (row, kind, hpt, span = 0) => { aoa.push(row); kinds.push(kind); heights.push(hpt); spans.push(span); };
+    push([title], 'title', 30);
+    meta.forEach(m => push(m, 'meta', 18));
+    sections.forEach(s => {
+      push([], 'blank', 10);
+      if (s.title) push([s.title], 'section', 24);
+      const n = s.table[0].length;
+      push(s.table[0], 'head', 32, n);
+      const body = s.table.slice(1);
+      if (body.length) body.forEach((r, i) => push(r, i % 2 ? 'zebra' : 'body', 0, n));
+      else push([s.empty || 'Không có dữ liệu'], 'empty', 22, n);
+    });
+    const width = Math.max(2, ...aoa.filter((_, i) => ['head', 'body', 'zebra'].includes(kinds[i])).map(r => r.length));
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const merges = [];
+    const isCenter = (v, head) => /^(stt|mã|tháng|ngày|giờ|bắt đầu|kết thúc|hiệu lực|trạng thái|loại vi phạm|kết quả)/i.test(head) || /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(v) || /^\d{1,2}:\d{2}/.test(v);
+    let head = [];
+    for (let r = 0; r < aoa.length; r++) {
+      const k = kinds[r];
+      if (k === 'head') head = aoa[r].map(h => String(h ?? ''));
+      if (k === 'blank') continue;
+      if (['title', 'section'].includes(k)) merges.push({ s: { r, c: 0 }, e: { r, c: width - 1 } });
+      if (k === 'empty' && spans[r] > 1) merges.push({ s: { r, c: 0 }, e: { r, c: spans[r] - 1 } });
+      const span = k === 'meta' ? 2 : k === 'title' ? 1 : k === 'section' ? width : spans[r];
+      for (let c = 0; c < span; c++) {
+        const ref = XLSX.utils.encode_cell({ r, c });
+        const cell = ws[ref] || (ws[ref] = { t: 's', v: '' });
+        const v = cell.v, sv = String(v ?? '');
+        let s;
+        if (k === 'title') s = { font: { name: FONT, sz: 16, bold: true, color: { rgb: C.accent } }, alignment: { vertical: 'center' } };
+        else if (k === 'meta') s = c === 0
+          ? { font: { name: FONT, sz: 10, bold: true, color: { rgb: C.muted } }, alignment: { vertical: 'center' } }
+          : { font: { name: FONT, sz: 10, bold: true, color: { rgb: C.ink } }, alignment: { horizontal: 'left', vertical: 'center' } };
+        else if (k === 'section') s = { font: { name: FONT, sz: 12, bold: true, color: { rgb: C.accent } }, fill: { patternType: 'solid', fgColor: { rgb: C.soft } }, alignment: { vertical: 'center', indent: 1 }, border: { left: { style: 'thick', color: { rgb: C.accent } } } };
+        else if (k === 'head') s = { font: { name: FONT, sz: 10, bold: true, color: { rgb: 'FFFFFF' } }, fill: { patternType: 'solid', fgColor: { rgb: C.accent } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border };
+        else if (k === 'empty') s = { font: { name: FONT, sz: 10, italic: true, color: { rgb: C.muted } }, alignment: { horizontal: 'center', vertical: 'center' }, border };
+        else { // body / zebra
+          const h = head[c] || '';
+          const num = cell.t === 'n';
+          const res = /^kết quả$/i.test(h) ? (/^KHÔNG/i.test(sv) ? C.green : sv ? C.red : null) : null;
+          s = {
+            font: { name: FONT, sz: 10, color: { rgb: res || C.ink }, bold: !!res || (c === 0 && /^tên nhân sự|^họ và tên/i.test(h)) },
+            // số tiền (≥ 1.000) căn phải; số đếm nhỏ, STT, mã, ngày giờ căn giữa; chữ căn trái
+            alignment: { vertical: 'center', horizontal: num && Math.abs(v) >= 1000 ? 'right' : (num || isCenter(sv, h)) ? 'center' : 'left', wrapText: !num, indent: num || isCenter(sv, h) ? 0 : 1 },
+            border,
+          };
+          if (k === 'zebra') s.fill = { patternType: 'solid', fgColor: { rgb: C.zebra } };
+          if (num) cell.z = Number.isInteger(v) && Math.abs(v) >= 1000 ? '#,##0;[Red]-#,##0' : Number.isInteger(v) ? '0;[Red]-0' : '#,##0.##';
+        }
+        cell.s = s;
+      }
+    }
+    ws['!merges'] = merges;
+    const cols = Array.from({ length: width }, (_, i) => {
+      let w = 10;
+      aoa.forEach((row, r) => {
+        const k = kinds[r], v = row[i];
+        if (v == null || v === '') return;
+        const len = String(typeof v === 'number' ? v.toLocaleString('vi-VN') : v).length;
+        if (k === 'head') w = Math.max(w, Math.min(len, 18) + 2);
+        else if (k === 'body' || k === 'zebra' || (k === 'meta' && i < 2)) w = Math.max(w, len + 3);
+      });
+      return Math.min(40, w);
+    });
+    ws['!cols'] = cols.map(wch => ({ wch }));
+    // Chiều cao dòng thân bảng: ước lượng số dòng khi xuống dòng (thư viện không tự co giãn)
+    ws['!rows'] = heights.map((h, r) => {
+      if (h) return { hpt: h };
+      if (kinds[r] !== 'body' && kinds[r] !== 'zebra') return {};
+      const lines = Math.max(1, ...aoa[r].map((v, c) => typeof v === 'number' ? 1 : Math.ceil(String(v ?? '').length / Math.max(1, cols[c] - 3))));
+      return { hpt: Math.max(20, lines * 14 + 6) };
+    });
+    return ws;
   }
 
   let downloadsApi;
@@ -777,14 +851,14 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   try { unlocked = sessionStorage.getItem(UNLOCK_KEY) === PW_HASH; } catch {}
   setLocked(!unlocked);
   window.__hr = { handleFiles, state, reports, buildWorkbook };
-  window.__shared = { toast, saveWorkbook };
+  window.__shared = { toast, saveWorkbook, styledSheet };
 })();
 </script>
 <script>
 // ===== Attendance module: late arrivals / early leaves / missed punches =====
 (() => {
   const $ = (id) => document.getElementById(id);
-  const { toast, saveWorkbook } = window.__shared;
+  const { toast, saveWorkbook, styledSheet } = window.__shared;
   const norm = (s) => String(s ?? '').trim();
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fold = (s) => norm(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
@@ -1186,8 +1260,6 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     // Một sheet duy nhất: các bảng xếp lần lượt từ trên xuống. Hai bảng chi tiết (có cột Kết quả) để cuối
     // nên tải lại chính file này vào tab vẫn đọc được.
     const period = S.month === 'all' ? 'Tất cả các tháng' : monthLabel(S.month);
-    const aoa = [['Báo cáo đi muộn – về sớm'], ['Kỳ báo cáo', period]];
-    const titleRows = [0];
     const months = aoaMonths(), units = aoaUnits(), people = aoaPeople(false), count = aoaDetail('count', false), free = aoaDetail('free', false);
     const sections = [
       ['TÓM TẮT THEO THÁNG', months],
@@ -1195,21 +1267,12 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
       [`TỔNG HỢP THEO NHÂN SỰ (${fmt(people.length - 1)} nhân sự)`, people],
       [`CHI TIẾT BỊ TÍNH (${fmt(count.length - 1)} lượt)`, count],
       [`CÓ ĐƠN – KHÔNG TÍNH (${fmt(free.length - 1)} lượt)`, free],
-    ];
-    let width = 2;
-    sections.forEach(([title, t], i) => {
-      width = Math.max(width, t[0].length);
-      aoa.push([]);
-      titleRows.push(aoa.length);
-      aoa.push([`${i + 1}. ${title}`]);
-      aoa.push(...t);
-      if (t.length === 1) aoa.push(['Không có dữ liệu']);
+    ].map(([title, table], i) => ({ title: `${i + 1}. ${title}`, table }));
+    const ws = styledSheet({
+      title: 'BÁO CÁO ĐI MUỘN – VỀ SỚM',
+      meta: [['Kỳ báo cáo', period], ['Ngày xuất', new Date().toLocaleDateString('vi-VN')]],
+      sections,
     });
-    const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!merges'] = titleRows.map(r => ({ s: { r, c: 0 }, e: { r, c: width - 1 } }));
-    ws['!cols'] = Array.from({ length: width }, (_, i) => ({
-      wch: Math.min(45, Math.max(10, ...aoa.filter((_, r) => !titleRows.includes(r)).map(row => String(row[i] ?? '').length + 2))),
-    }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Đi muộn – về sớm');
     const tag = S.month === 'all' ? 'tat-ca' : (norm(S.month).replace(/[^\w-]+/g, '-') || 'thang');
