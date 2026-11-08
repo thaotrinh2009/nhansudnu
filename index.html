@@ -1029,7 +1029,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   // ---------- tính từ dữ liệu vân tay + đơn từ ----------
   // Quy tắc (theo báo cáo mẫu của phòng Nhân sự):
   //  • Đi muộn: giờ vào > giờ vào chuẩn. Về sớm: giờ ra < giờ ra chuẩn (chỉ khi có giờ ra). Ngày chỉ chấm 1 lần → lần chấm là giờ vào.
-  //  • Quên chấm công: ngày làm việc không có lần chấm nào; chỉ xét nhân sự đã chấm ít nhất 1 lần trong file.
+  //  • Quên chấm công: ngày làm việc không có lần chấm nào; chỉ xét nhân sự trong những tháng họ có chấm ít nhất 1 lần (cả tháng không chấm → bỏ qua tháng đó).
   //  • Bỏ Chủ nhật, Thứ 7 (tuỳ chọn) và ngày lễ nhập tay.
   //  • Bị tính: không có đơn, hoặc chỉ có đơn “Giải trình đi muộn về sớm”. Không tính: trùng ngày với đơn khác (nghỉ phép, làm ngoài VP…).
   const R = { punch: null, off: null, punchName: '', offName: '' };
@@ -1121,14 +1121,15 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     const people = new Map();
     for (const r of R.punch) {
       let p = people.get(r.id);
-      if (!p) { p = { id: r.id, name: r.name, unit: r.unit, used: false, days: new Map() }; people.set(r.id, p); }
-      if (r.tin != null) p.used = true;
+      if (!p) { p = { id: r.id, name: r.name, unit: r.unit, used: false, months: new Set(), days: new Map() }; people.set(r.id, p); }
+      if (r.tin != null) { p.used = true; p.months.add(mkey(r.d)); } // tháng có ít nhất 1 lần chấm
       const k = dkey(r.d), cur = p.days.get(k);
       if (!cur || (cur.tin == null && r.tin != null)) p.days.set(k, r);
     }
     const users = [...people.values()].filter(p => p.used).sort((a, b) => a.unit.localeCompare(b.unit, 'vi') || a.name.localeCompare(b.name, 'vi'));
     const rows = [];
     for (const d of workDays) for (const p of users) {
+      if (!p.months.has(mkey(d))) continue; // cả tháng không chấm công (VD: giảng viên) → bỏ qua cả tháng
       const dk = dkey(d), r = p.days.get(dk), tin = r ? r.tin : null, tout = r ? r.tout : null;
       const v = [];
       if (tin == null && tout == null) v.push(['forgot', null]);
@@ -1141,7 +1142,9 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
       for (const [tk, mins] of v) rows.push({ month: mkey(d), date: dk, id: p.id, name: p.name, unit: p.unit, type: TYPE_LABEL[tk], tk,
         tin: hm(tin), tout: hm(tout), mins: mins == null ? '' : String(mins), doc, result, rk: result === 'Bị tính' ? 'count' : 'free' });
     }
-    return { rows, users: users.length, days: workDays.length };
+    const allMonths = [...new Set(workDays.map(mkey))];
+    const skipped = users.reduce((n, p) => n + allMonths.filter(m => !p.months.has(m)).length, 0); // số lượt nhân sự × tháng bị bỏ qua
+    return { rows, users: users.length, days: workDays.length, skipped };
   }
   function resetRawSlots() {
     $('attSlotPunch').classList.remove('ok'); $('attSlotPunch').querySelector('.file').textContent = PUNCH_HINT;
@@ -1162,7 +1165,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     const res = computeRaw();
     if (!res.rows.length) { S.rows = []; $('attReport').hidden = true; $('attWelcome').hidden = false; toast('Không có lượt vi phạm nào trong dữ liệu vân tay.'); return; }
     setRows(res.rows, R.punchName);
-    S.stats = { users: res.users, days: res.days, punchName: R.punchName, offName: R.offName };
+    S.stats = { users: res.users, days: res.days, skipped: res.skipped, punchName: R.punchName, offName: R.offName };
     toast(`Đã tính ${fmt(res.users)} nhân sự dùng máy chấm công · ${fmt(res.days)} ngày làm việc`);
   }
 
@@ -1422,10 +1425,11 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
         [`   • Chấm công: ${st.punchName || 'Dữ liệu vân tay'} (${pt})`],
         [`   • Đơn từ: ${st.offName || 'chưa tải file đơn từ'} (bỏ đơn Đã hủy${$('attCfgRej').checked ? '' : ', Từ chối, Chờ duyệt'})`],
         [`   • Chỉ phân tích ${fmt(st.users)} nhân sự có sử dụng máy chấm công · ${fmt(st.days)} ngày làm việc`],
+        ...(st.skipped ? [[`   • Bỏ qua ${fmt(st.skipped)} lượt nhân sự × tháng không chấm công lần nào trong tháng`]] : []),
         [`   • Loại trừ: Chủ nhật${$('attCfgSat').checked ? ', Thứ 7' : ''}${hol.length ? ', ' + hol.join(', ') : ''}`],
       ] : [[`   • Nạp từ báo cáo đã xử lý: ${S.file || ''}`]]),
       ['4. LƯU Ý', 'h'],
-      ['   ⚠ Dữ liệu quên chấm công chỉ tính cho nhân sự đã từng chấm công ít nhất 1 lần'],
+      ['   ⚠ Chỉ tính nhân sự có chấm công: tháng nào nhân sự không chấm lần nào (VD: giảng viên) thì bỏ qua cả tháng đó, không tính quên chấm công'],
       [`   ⚠ Ngưỡng ${cfgIn} và ${cfgOut} có thể điều chỉnh theo quy định thực tế`],
       ['   ⚠ Ngày lễ chỉ loại trừ theo danh sách nhập trên trang'],
       [`   Xuất ngày ${new Date().toLocaleDateString('vi-VN')}`],
