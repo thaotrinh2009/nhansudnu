@@ -25,7 +25,7 @@ Có 2 cách nạp dữ liệu (trang tự nhận diện file theo tiêu đề c�
 
 1. **Tính từ dữ liệu gốc**: kéo thả cùng lúc file **vân tay** (cột Mã nhân sự, Ngày, Giờ vào, Giờ ra) và file **đơn từ** `Exported.Timeoff…xls` (cột Mã nhân sự, @tên nhóm, Ca đề xuất, Trạng thái).
    - Đi muộn: giờ vào sau 08:00. Về sớm: giờ ra trước 17:00 (chỉ khi có giờ ra). Ngày chỉ chấm 1 lần: lần chấm được coi là giờ vào.
-   - Quên chấm công: ngày làm việc không có lần chấm nào; chỉ xét nhân sự đã chấm ít nhất 1 lần trong file.
+   - Quên chấm công: ngày làm việc không có lần chấm nào. Chỉ tính nhân sự có chấm công: tháng nào một người không chấm lần nào (VD: giảng viên) thì bỏ qua người đó trong cả tháng.
    - Bỏ Chủ nhật, Thứ 7 và các ngày lễ nhập tay.
    - **Bị tính**: không có đơn, hoặc chỉ có đơn “Giải trình đi muộn về sớm”. **Không tính**: trùng ngày với đơn khác (nghỉ phép, làm việc ngoài văn phòng…). Đơn “Đã hủy” bị bỏ qua.
    - Giờ chuẩn, Thứ 7, ngày lễ và trạng thái đơn chỉnh được ngay trên trang.
