@@ -770,16 +770,75 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     const scope = $('exportScope').value === 'all' ? '*' : state.month;
     await saveWorkbook(buildWorkbook(scope), `bien-dong-nhan-su-${scope === '*' ? 'tat-ca' : scope}.xlsx`);
   }
+  // Một bảng / một sheet theo mẫu báo cáo: dòng 1 tiêu đề (gộp ô), dòng 2 tiêu đề cột, dữ liệu, dòng TỔNG (nếu có).
+  // opt: { title, head, rows, total, widths, align: ['center'|'left'|'right'...], wrap: [bool], strong: [cột tô đỏ đậm],
+  //        theme: { title, head } (mã màu), filter: true để bật lọc }
+  function tableSheet(opt) {
+    const th = Object.assign({ title: '1F3864', head: '1F3864', total: 'DAE3F3' }, opt.theme || {});
+    const n = opt.head.length, FONT = 'Arial';
+    const line = { style: 'thin', color: { rgb: 'A6A6A6' } };
+    const border = { top: line, bottom: line, left: line, right: line };
+    const aoa = [[opt.title], opt.head, ...opt.rows];
+    if (opt.total) aoa.push(opt.total);
+    if (!opt.rows.length) aoa.push([opt.empty || 'Không có dữ liệu']);
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const last = aoa.length - 1, totalRow = opt.total ? last - (opt.rows.length ? 0 : 1) : -1;
+    for (let r = 0; r < aoa.length; r++) for (let c = 0; c < n; c++) {
+      const ref = XLSX.utils.encode_cell({ r, c });
+      const cell = ws[ref] || (ws[ref] = { t: 's', v: '' });
+      if (r === 0) cell.s = { font: { name: FONT, sz: 13, bold: true, color: { rgb: 'FFFFFF' } }, fill: { patternType: 'solid', fgColor: { rgb: th.title } }, alignment: { horizontal: 'center', vertical: 'center' } };
+      else if (r === 1) cell.s = { font: { name: FONT, sz: 10, bold: true, color: { rgb: 'FFFFFF' } }, fill: { patternType: 'solid', fgColor: { rgb: th.head } }, alignment: { horizontal: 'center', vertical: 'center', wrapText: true }, border };
+      else {
+        const isTotal = r === totalRow, strong = (opt.strong || []).includes(c);
+        cell.s = {
+          font: { name: FONT, sz: 10, bold: isTotal || strong, color: strong && !isTotal ? { rgb: 'C00000' } : undefined },
+          alignment: { horizontal: (opt.align || [])[c] || 'center', vertical: 'center', wrapText: !!(opt.wrap || [])[c] },
+          fill: { patternType: 'solid', fgColor: { rgb: isTotal ? th.total : 'FFFFFF' } },
+          border,
+        };
+        if (cell.t === 'n' && Math.abs(cell.v) >= 1000) cell.z = '#,##0';
+      }
+    }
+    const merges = [{ s: { r: 0, c: 0 }, e: { r: 0, c: n - 1 } }];
+    if (!opt.rows.length) merges.push({ s: { r: last, c: 0 }, e: { r: last, c: n - 1 } });
+    ws['!merges'] = merges;
+    ws['!cols'] = (opt.widths || []).map(wch => ({ wch }));
+    ws['!rows'] = [{ hpt: 30 }, { hpt: 34 }];
+    if (opt.filter && opt.rows.length) ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 1, c: 0 }, e: { r: 1 + opt.rows.length, c: n - 1 } }) };
+    ws['!view'] = { freeze: 2 }; // cố định 2 dòng đầu (xử lý khi ghi file)
+    return ws;
+  }
+
+  // Thư viện không ghi được "cố định dòng" và "ẩn đường lưới": sửa thẳng XML từng sheet sau khi ghi.
+  function workbookBytes(wb) {
+    const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    try {
+      const z = XLSX.CFB.read(new Uint8Array(buf), { type: 'array' });
+      let touched = false;
+      wb.SheetNames.forEach((name, i) => {
+        const v = wb.Sheets[name]['!view'] || {};
+        const e = XLSX.CFB.find(z, `/xl/worksheets/sheet${i + 1}.xml`);
+        if (!e) return;
+        const pane = v.freeze ? `<pane ySplit="${v.freeze}" topLeftCell="A${v.freeze + 1}" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A${v.freeze + 1}" sqref="A${v.freeze + 1}"/>` : '';
+        const xml = new TextDecoder().decode(e.content)
+          .replace('<sheetView workbookViewId="0"/>', `<sheetView showGridLines="0" workbookViewId="0">${pane}</sheetView>`);
+        e.content = new TextEncoder().encode(xml); e.size = e.content.length; touched = true;
+      });
+      return touched ? XLSX.CFB.write(z, { fileType: 'zip', type: 'array' }) : buf;
+    } catch { return buf; }
+  }
+
   async function saveWorkbook(wb, filename) {
+    const data = new Blob([workbookBytes(wb)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     if (downloadsApi) {
-      const data = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })]);
       try { await downloadsApi.save({ filename, data }); toast('Đã xuất ' + filename); }
       catch (e) {
         if (e?.code === 'declined') return;
         toast(e?.code === 'rate_limited' ? 'Đang có một hộp thoại tải xuống mở, hãy xác nhận nó trước.' : 'Không xuất được file trong chế độ xem này.');
       }
-    } else {
-      XLSX.writeFile(wb, filename); // page opened as a normal web page / local file
+    } else { // page opened as a normal web page / local file
+      const a = document.createElement('a'); a.href = URL.createObjectURL(data); a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     }
   }
 
@@ -851,14 +910,14 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   try { unlocked = sessionStorage.getItem(UNLOCK_KEY) === PW_HASH; } catch {}
   setLocked(!unlocked);
   window.__hr = { handleFiles, state, reports, buildWorkbook };
-  window.__shared = { toast, saveWorkbook, styledSheet };
+  window.__shared = { toast, saveWorkbook, styledSheet, tableSheet };
 })();
 </script>
 <script>
 // ===== Attendance module: late arrivals / early leaves / missed punches =====
 (() => {
   const $ = (id) => document.getElementById(id);
-  const { toast, saveWorkbook, styledSheet } = window.__shared;
+  const { toast, saveWorkbook, styledSheet, tableSheet } = window.__shared;
   const norm = (s) => String(s ?? '').trim();
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fold = (s) => norm(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
@@ -913,6 +972,19 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
       const hi = aoa.findIndex(r => r.some(c => fold(c) === 'ket qua') && r.some(c => COLS.id.includes(fold(c))));
       if (hi >= 0) return { aoa, hi };
     }
+    // File theo mẫu DS vi phạm: kết quả nằm ở tên sheet (Chi tiết BỊ TÍNH / Có đơn - Không tính)
+    const merged = [];
+    for (const sn of wb.SheetNames) {
+      const f = fold(sn), res = /khong tinh/.test(f) ? 'KHÔNG TÍNH' : /bi tinh/.test(f) ? 'BỊ TÍNH' : '';
+      if (!res) continue;
+      const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: false, defval: '' });
+      const hi = aoa.findIndex(r => r.some(c => COLS.type.includes(fold(c))) && r.some(c => COLS.id.includes(fold(c))));
+      if (hi < 0) continue;
+      if (!merged.length) merged.push([...aoa[hi], 'Kết quả']);
+      const head = aoa[hi].map(fold), base = merged[0].map(fold);
+      aoa.slice(hi + 1).forEach(r => merged.push([...base.slice(0, -1).map(h => r[head.indexOf(h)] ?? ''), res]));
+    }
+    if (merged.length > 1) return { aoa: merged, hi: 0 };
     return null;
   }
   function setRows(rows, label) {
@@ -941,7 +1013,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
       }).filter(o => (o.id || o.name) && o.rk);
       if (!rows.length) throw new Error(`“${fileName}” không có dòng nào có Kết quả là “BỊ TÍNH” hoặc “KHÔNG TÍNH”.`);
       Object.assign(R, { punch: null, off: null, punchName: '', offName: '' });
-      resetRawSlots(); $('attCfg').hidden = true; $('attWarn').hidden = true;
+      resetRawSlots(); $('attCfg').hidden = true; $('attWarn').hidden = true; S.stats = null;
       $('attSlot').classList.add('ok'); $('attSlot').querySelector('.file').textContent = '✓ ' + fileName;
       setRows(rows, fileName);
     }
@@ -1090,6 +1162,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     const res = computeRaw();
     if (!res.rows.length) { S.rows = []; $('attReport').hidden = true; $('attWelcome').hidden = false; toast('Không có lượt vi phạm nào trong dữ liệu vân tay.'); return; }
     setRows(res.rows, R.punchName);
+    S.stats = { users: res.users, days: res.days, punchName: R.punchName, offName: R.offName };
     toast(`Đã tính ${fmt(res.users)} nhân sự dùng máy chấm công · ${fmt(res.days)} ngày làm việc`);
   }
 
@@ -1256,27 +1329,119 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     });
   }
 
+  // ---------- Xuất Excel theo mẫu "DS vi phạm chấm công": nhiều sheet ----------
+  // Tổng hợp · Chi tiết BỊ TÍNH · Có đơn - Không tính · Tóm tắt theo tháng · Theo Khoa - Bộ phận · Ghi chú - Quy tắc
+  const mParts = (m) => { const x = norm(m).match(/(\d{1,2})\D+(\d{4})/); return x ? { m: +x[1], y: +x[2] } : null; };
+  const tLabel = (m) => { const p = mParts(m); return p ? `T${p.m}-${p.y}` : norm(m); };
+  const dOrd = (d) => { const x = norm(d).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/); return x ? +x[3] * 10000 + +x[2] * 100 + +x[1] : 0; };
+  const TORD = { late: 0, early: 1, forgot: 2, other: 3 };
+  const byPerson = (a, b) => (a.unit || '').localeCompare(b.unit || '', 'vi') || (a.name || '').localeCompare(b.name || '', 'vi') || String(a.id).localeCompare(String(b.id));
+  function periodText(ms, short) {
+    const ps = ms.map(mParts).filter(Boolean);
+    if (!ps.length) return short ? 'tất cả các tháng' : 'TẤT CẢ CÁC THÁNG';
+    const f = ps[0], l = ps[ps.length - 1];
+    if (short) return ps.length === 1 ? `T${f.m}/${f.y}` : f.y === l.y ? `T${f.m} đến T${l.m}/${l.y}` : `T${f.m}/${f.y} đến T${l.m}/${l.y}`;
+    if (ps.length === 1) return `THÁNG ${f.m} NĂM ${f.y}`;
+    return f.y === l.y ? `THÁNG ${f.m} ĐẾN THÁNG ${l.m} NĂM ${l.y}` : `THÁNG ${f.m}/${f.y} ĐẾN THÁNG ${l.m}/${l.y}`;
+  }
+
   async function exportExcel() {
-    // Một sheet duy nhất: các bảng xếp lần lượt từ trên xuống. Hai bảng chi tiết (có cột Kết quả) để cuối
-    // nên tải lại chính file này vào tab vẫn đọc được.
-    const period = S.month === 'all' ? 'Tất cả các tháng' : monthLabel(S.month);
-    const months = aoaMonths(), units = aoaUnits(), people = aoaPeople(false), count = aoaDetail('count', false), free = aoaDetail('free', false);
-    const sections = [
-      ['TÓM TẮT THEO THÁNG', months],
-      [`THEO KHOA / BỘ PHẬN (${fmt(units.length - 1)} đơn vị)`, units],
-      [`TỔNG HỢP THEO NHÂN SỰ (${fmt(people.length - 1)} nhân sự)`, people],
-      [`CHI TIẾT BỊ TÍNH (${fmt(count.length - 1)} lượt)`, count],
-      [`CÓ ĐƠN – KHÔNG TÍNH (${fmt(free.length - 1)} lượt)`, free],
-    ].map(([title, table], i) => ({ title: `${i + 1}. ${title}`, table }));
-    const ws = styledSheet({
-      title: 'BÁO CÁO ĐI MUỘN – VỀ SỚM',
-      meta: [['Kỳ báo cáo', period], ['Ngày xuất', new Date().toLocaleDateString('vi-VN')]],
-      sections,
-    });
+    const months = viewMonths();
+    const sameYear = new Set(months.map(m => mParts(m)?.y)).size <= 1;
+    const mShort = (m) => { const p = mParts(m); return p ? (sameYear ? `T${p.m}` : `T${p.m}/${String(p.y).slice(2)}`) : norm(m); };
+    const rows = (rk) => S.rows.filter(r => r.rk === rk && inM(r))
+      .sort((a, b) => months.indexOf(a.month) - months.indexOf(b.month) || byPerson(a, b) || dOrd(a.date) - dOrd(b.date) || TORD[a.tk] - TORD[b.tk]);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Đi muộn – về sớm');
+
+    // 1. Tổng hợp theo nhân sự (gồm cả người chỉ quên chấm công)
+    const people = new Map();
+    S.rows.filter(r => r.rk === 'count' && inM(r)).forEach(r => {
+      if (!people.has(r.id)) people.set(r.id, { id: r.id, name: r.name, unit: r.unit, c: {}, late: 0, early: 0, forgot: 0 });
+      const e = people.get(r.id), c = e.c[r.month] = e.c[r.month] || { late: 0, early: 0, forgot: 0 };
+      if (c[r.tk] != null) { c[r.tk]++; e[r.tk]++; }
+    });
+    const plist = [...people.values()].sort(byPerson);
+    const tHead = ['STT', 'Mã NV', 'Họ và tên', 'Khoa/Bộ phận'];
+    months.forEach(m => tHead.push(`${mShort(m)}\nĐi muộn`, `${mShort(m)}\nVề sớm`, `${mShort(m)}\nQuên CC`));
+    tHead.push('Tổng\nĐi muộn', 'Tổng\nVề sớm', 'Tổng\nQuên CC', 'TỔNG\nVI PHẠM');
+    const tRows = plist.map((e, i) => [i + 1, e.id, e.name, e.unit, ...months.flatMap(m => ['late', 'early', 'forgot'].map(k => e.c[m]?.[k] || 0)),
+      e.late, e.early, e.forgot, e.late + e.early + e.forgot]);
+    const tTotal = ['TỔNG', '', `(${fmt(plist.length)} nhân sự)`, '', ...tRows.length ? tRows[0].slice(4).map((_, j) => tRows.reduce((s, r) => s + r[4 + j], 0)) : tHead.slice(4).map(() => 0)];
+    const nT = tHead.length;
+    XLSX.utils.book_append_sheet(wb, tableSheet({
+      title: `BÁO CÁO ĐI MUỘN VỀ SỚM - ${periodText(months)}`, head: tHead, rows: tRows, total: tTotal, filter: true,
+      widths: [6, 11, 24, 34, ...Array(nT - 5).fill(8), 10], align: ['center', 'center', 'left', 'left'], strong: [nT - 1],
+    }), 'Tổng hợp');
+
+    // 2–3. Chi tiết
+    const dHead = ['STT', 'Tháng', 'Ngày', 'Mã NV', 'Họ và tên', 'Khoa/Bộ phận', 'Giờ vào', 'Giờ ra', 'Loại vi phạm', 'Muộn/Sớm (phút)', 'Đơn từ liên quan'];
+    const dRow = (r, i) => [i + 1, tLabel(r.month), r.date, r.id, r.name, r.unit, r.tin || '', r.tout || '', r.type,
+      r.tk === 'forgot' || r.mins === '' ? '-' : toNum(r.mins), r.doc];
+    const dOpt = { head: dHead, filter: true, widths: [7, 9, 11, 11, 24, 32, 9, 9, 15, 10, 36],
+      align: ['center', 'center', 'center', 'center', 'left', 'left', 'center', 'center', 'center', 'center', 'left'], wrap: [, , , , , , , , , , true] };
+    const pt = periodText(months, true);
+    const count = rows('count'), free = rows('free');
+    XLSX.utils.book_append_sheet(wb, tableSheet({ ...dOpt, title: `CHI TIẾT VI PHẠM ĐI MUỘN VỀ SỚM (BỊ TÍNH) - ${pt}`, rows: count.map(dRow), empty: 'Không có lượt vi phạm bị tính' }), 'Chi tiết BỊ TÍNH');
+    XLSX.utils.book_append_sheet(wb, tableSheet({ ...dOpt, title: 'NHÂN SỰ ĐI MUỘN VỀ SỚM CÓ ĐƠN TỪ HỢP LỆ - KHÔNG TÍNH VI PHẠM (để tham khảo)', rows: free.map(dRow),
+      empty: 'Không có lượt nào có đơn hợp lệ', theme: { title: '375623', head: '548235', total: 'E2EFDA' } }), 'Có đơn - Không tính');
+
+    // 4. Tóm tắt theo tháng
+    const md = monthData();
+    const mRows = md.map(m => [tLabel(m.m), m.late, m.early, m.forgot, m.total]);
+    const sum = (k) => md.reduce((s, m) => s + m[k], 0);
+    XLSX.utils.book_append_sheet(wb, tableSheet({
+      title: 'TÓM TẮT VI PHẠM THEO THÁNG', head: ['Tháng', 'Đi muộn', 'Về sớm', 'Quên chấm công', 'Tổng vi phạm'], rows: mRows,
+      total: ['TỔNG', sum('late'), sum('early'), sum('forgot'), sum('total')], widths: [14, 14, 14, 16, 16], strong: [4], theme: { head: '2F5496' },
+    }), 'Tóm tắt theo tháng');
+
+    // 5. Theo Khoa - Bộ phận
+    const ud = unitData().sort((a, b) => a.unit.localeCompare(b.unit, 'vi'));
+    const usum = (k) => ud.reduce((s, u) => s + u[k], 0);
+    XLSX.utils.book_append_sheet(wb, tableSheet({
+      title: `VI PHẠM THEO KHOA / BỘ PHẬN - ${pt}`, head: ['STT', 'Khoa/Bộ phận', 'Số nhân sự vi phạm', 'Đi muộn', 'Về sớm', 'Quên chấm công', 'Tổng vi phạm'],
+      rows: ud.map((u, i) => [i + 1, u.unit, u.people, u.late, u.early, u.forgot, u.total]),
+      total: ['TỔNG', `(${fmt(ud.length)} đơn vị)`, plist.length, usum('late'), usum('early'), usum('forgot'), usum('total')],
+      widths: [6, 38, 12, 11, 11, 13, 13], align: ['center', 'left'], strong: [6], theme: { head: '2F5496' },
+    }), 'Theo Khoa - Bộ phận');
+
+    // 6. Ghi chú - Quy tắc
+    const cfgIn = $('attCfgIn').value || '08:00', cfgOut = $('attCfgOut').value || '17:00';
+    const hol = $('attCfgHol').value.match(/\d{1,2}\/\d{1,2}\/\d{4}/g) || [];
+    const st = S.stats;
+    const notes = [
+      ['GHI CHÚ VÀ QUY TẮC ÁP DỤNG', 'title'], ['', ''],
+      ['1. TIÊU CHÍ ĐI MUỘN / VỀ SỚM', 'h'],
+      [`   • Đi muộn: Giờ vào > ${cfgIn}`], [`   • Về sớm: Giờ ra < ${cfgOut} (và có ghi nhận giờ ra)`],
+      ['   • Quên chấm công: ngày làm việc không có lần chấm nào'],
+      ['2. QUY TẮC TÍNH VI PHẠM', 'h'],
+      ['   ✓ BỊ TÍNH: Đi muộn/về sớm + Có đơn "Giải trình đi muộn về sớm"'], ['   ✓ BỊ TÍNH: Đi muộn/về sớm + Không có đơn nào'],
+      ['   ✗ KHÔNG TÍNH: Đi muộn/về sớm + Có đơn khác (nghỉ phép, làm ngoài VP...)'],
+      ['   ✓ BỊ TÍNH: Quên chấm công + Không có đơn'], ['   ✗ KHÔNG TÍNH: Quên chấm công + Có đơn xin nghỉ hoặc Làm việc ngoài VP'],
+      ['3. DỮ LIỆU ĐẦU VÀO', 'h'],
+      ...(st ? [
+        [`   • Chấm công: ${st.punchName || 'Dữ liệu vân tay'} (${pt})`],
+        [`   • Đơn từ: ${st.offName || 'chưa tải file đơn từ'} (bỏ đơn Đã hủy${$('attCfgRej').checked ? '' : ', Từ chối, Chờ duyệt'})`],
+        [`   • Chỉ phân tích ${fmt(st.users)} nhân sự có sử dụng máy chấm công · ${fmt(st.days)} ngày làm việc`],
+        [`   • Loại trừ: Chủ nhật${$('attCfgSat').checked ? ', Thứ 7' : ''}${hol.length ? ', ' + hol.join(', ') : ''}`],
+      ] : [[`   • Nạp từ báo cáo đã xử lý: ${S.file || ''}`]]),
+      ['4. LƯU Ý', 'h'],
+      ['   ⚠ Dữ liệu quên chấm công chỉ tính cho nhân sự đã từng chấm công ít nhất 1 lần'],
+      [`   ⚠ Ngưỡng ${cfgIn} và ${cfgOut} có thể điều chỉnh theo quy định thực tế`],
+      ['   ⚠ Ngày lễ chỉ loại trừ theo danh sách nhập trên trang'],
+      [`   Xuất ngày ${new Date().toLocaleDateString('vi-VN')}`],
+    ];
+    const nws = XLSX.utils.aoa_to_sheet(notes.map(n => [n[0]]));
+    notes.forEach(([, k], r) => {
+      const cell = nws[XLSX.utils.encode_cell({ r, c: 0 })] || (nws[XLSX.utils.encode_cell({ r, c: 0 })] = { t: 's', v: '' });
+      cell.s = k === 'title' ? { font: { name: 'Arial', sz: 14, bold: true, color: { rgb: 'FFFFFF' } }, fill: { patternType: 'solid', fgColor: { rgb: '1F3864' } }, alignment: { vertical: 'center' } }
+        : k === 'h' ? { font: { name: 'Arial', sz: 11, bold: true, color: { rgb: 'FFFFFF' } }, fill: { patternType: 'solid', fgColor: { rgb: '2F5496' } }, alignment: { vertical: 'center' } }
+        : { font: { name: 'Arial', sz: 10 }, alignment: { vertical: 'center' } };
+    });
+    nws['!cols'] = [{ wch: 90 }]; nws['!rows'] = notes.map(([, k]) => ({ hpt: k === 'title' ? 26 : 18 }));
+    XLSX.utils.book_append_sheet(wb, nws, 'Ghi chú - Quy tắc');
+
     const tag = S.month === 'all' ? 'tat-ca' : (norm(S.month).replace(/[^\w-]+/g, '-') || 'thang');
-    await saveWorkbook(wb, `di-muon-ve-som-${tag}.xlsx`);
+    await saveWorkbook(wb, `DS-vi-pham-cham-cong-${tag}.xlsx`);
   }
 
   // ---------- wiring ----------

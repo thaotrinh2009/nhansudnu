@@ -29,14 +29,21 @@ Có 2 cách nạp dữ liệu (trang tự nhận diện file theo tiêu đề c�
    - Bỏ Chủ nhật, Thứ 7 và các ngày lễ nhập tay.
    - **Bị tính**: không có đơn, hoặc chỉ có đơn “Giải trình đi muộn về sớm”. **Không tính**: trùng ngày với đơn khác (nghỉ phép, làm việc ngoài văn phòng…). Đơn “Đã hủy” bị bỏ qua.
    - Giờ chuẩn, Thứ 7, ngày lễ và trạng thái đơn chỉnh được ngay trên trang.
-2. **Báo cáo đã xử lý**: 1 file có sheet **Dữ liệu gốc** (cột Tháng, Mã NV, Họ và tên, Khoa/Bộ phận, Loại vi phạm, Ngày, Giờ vào, Giờ ra, Muộn/Sớm (phút), Đơn từ liên quan, Kết quả).
+2. **Báo cáo đã xử lý**: file DS vi phạm do trang xuất ra (sheet Chi tiết BỊ TÍNH + Có đơn - Không tính), hoặc 1 file có sheet **Dữ liệu gốc** (cột Tháng, Mã NV, Họ và tên, Khoa/Bộ phận, Loại vi phạm, Ngày, Giờ vào, Giờ ra, Muộn/Sớm (phút), Đơn từ liên quan, Kết quả).
 
 Trang hiện: tóm tắt theo tháng và theo khoa / bộ phận, tổng hợp theo nhân sự, chi tiết lượt **BỊ TÍNH** và các lượt có đơn **KHÔNG TÍNH**.
-Xuất Excel theo tháng đang chọn ra **1 sheet**: tóm tắt theo tháng, theo khoa / bộ phận, tổng hợp nhân sự, chi tiết bị tính, có đơn – không tính (tải lại file này vào tab là xem được ngay).
+Xuất Excel theo tháng đang chọn ra file **DS vi phạm chấm công** (theo mẫu của phòng nhân sự), gồm 6 sheet:
+
+1. **Tổng hợp**: mỗi nhân sự có vi phạm bị tính (kể cả người chỉ quên chấm công) một dòng, xếp theo Khoa/Bộ phận rồi họ tên; mỗi tháng 3 cột Đi muộn / Về sớm / Quên CC, cộng tổng và TỔNG VI PHẠM, dòng TỔNG cuối bảng.
+2. **Chi tiết BỊ TÍNH**: STT, Tháng (T4-2026), Ngày, Mã NV, Họ và tên, Khoa/Bộ phận, Giờ vào, Giờ ra, Loại vi phạm, Muộn/Sớm (phút) (“-” với quên chấm công), Đơn từ liên quan.
+3. **Có đơn - Không tính**: cùng cột, để tham khảo.
+4. **Tóm tắt theo tháng**, 5. **Theo Khoa - Bộ phận**, 6. **Ghi chú - Quy tắc** (giờ chuẩn, ngày loại trừ, số nhân sự phân tích lấy từ cấu hình trên trang).
+
+Các sheet có cố định dòng tiêu đề, bật lọc, ẩn đường lưới. Tải lại file này (hoặc file mẫu cùng cấu trúc) vào tab là xem được ngay: trang đọc sheet “Chi tiết BỊ TÍNH” và “Có đơn - Không tính”.
 
 ## Định dạng file Excel xuất ra
 
-Cả 2 tab xuất cùng một kiểu: tiêu đề lớn, khối Kỳ báo cáo / Ngày xuất, mỗi bảng có thanh tiêu đề mục màu xanh nhạt, dòng tiêu đề cột nền xanh chữ trắng, viền mảnh, dòng xen kẽ màu, số tiền có dấu phân cách hàng nghìn, chữ dài tự xuống dòng. Bảng Biến động nhân sự có thêm cột STT. Cột Kết quả (đi muộn – về sớm) tô đỏ BỊ TÍNH / xanh KHÔNG TÍNH. Nội dung ô không đổi nên file xuất ra vẫn tải lại vào tab Đi muộn – Về sớm được.
+Tab Biến động nhân sự xuất 1 sheet: tiêu đề lớn, khối Kỳ báo cáo / Ngày xuất, mỗi bảng có thanh tiêu đề mục màu xanh nhạt, dòng tiêu đề cột nền xanh chữ trắng, viền mảnh, dòng xen kẽ màu, số tiền có dấu phân cách hàng nghìn, chữ dài tự xuống dòng. Bảng Biến động nhân sự có thêm cột STT.
 
 ## Sử dụng
 
