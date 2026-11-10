@@ -201,7 +201,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
         <input type="search" id="q" placeholder="Tên, mã nhân sự, đơn vị…">
       </div>
       <div class="field export">
-        <label class="label" for="exportScope">Xuất Excel (4 bảng, 1 sheet)</label>
+        <label class="label" for="exportScope">Xuất Excel (5 bảng, 1 sheet)</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <select id="exportScope">
             <option value="month">Tháng đang chọn</option>
@@ -210,6 +210,25 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
           <button class="btn" id="exportBtn" type="button">Xuất Excel</button>
         </div>
       </div>
+    </div>
+    <div class="bar">
+      <div class="field">
+        <label class="label" for="signMaker">Người lập</label>
+        <input type="text" id="signMaker">
+      </div>
+      <div class="field">
+        <label class="label" for="signBoss">Lãnh đạo đơn vị</label>
+        <input type="text" id="signBoss">
+      </div>
+      <div class="field">
+        <label class="label" for="signPlace">Nơi ký</label>
+        <input type="text" id="signPlace" style="width:110px">
+      </div>
+      <div class="field">
+        <label class="label" for="signDate">Ngày ký</label>
+        <input type="date" id="signDate">
+      </div>
+      <div class="dim" style="font-size:12px;padding-bottom:9px">Tên và ngày in vào phần ký cuối file Excel xuất.</div>
     </div>
 
     <div class="tabs" role="tablist">
@@ -715,9 +734,12 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     });
     const ws = styledSheet({
       title: 'BÁO CÁO BIẾN ĐỘNG NHÂN SỰ',
-      meta: [['Kỳ báo cáo', all ? 'Tất cả các tháng' : mLabel(month)], ['Ngày xuất', new Date().toLocaleDateString('vi-VN')]],
+      meta: [['Kỳ báo cáo', all ? 'Tất cả các tháng' : mLabel(month)]],
       sections,
+      letterhead: { left: ['TRƯỜNG ĐẠI HỌC ĐẠI NAM', 'PHÒNG TỔ CHỨC NHÂN SỰ'], right: ['CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', 'Độc lập - Tự do - Hạnh phúc'] },
+      sign: signInfo(),
     });
+    ws['!printFit'] = true;
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Biến động nhân sự');
     return wb;
@@ -726,13 +748,23 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   // ---------- Excel styling (xlsx-js-style): tiêu đề, khối thông tin, bảng có viền, header màu ----------
   // blocks: { title, meta: [[nhãn, giá trị]], sections: [{ title, table: [header, ...rows], empty }] }
   // Trả về worksheet đã định dạng. Nội dung ô giữ nguyên như bản cũ (chỉ thêm định dạng) để đọc lại được.
-  function styledSheet({ title, meta = [], sections = [] }) {
+  // letterhead: { left: [dòng 1, dòng 2], right: [dòng 1, dòng 2] } — tiêu ngữ đầu văn bản
+  // sign: { date: 'Hà Nội, ngày …', left: [chức danh, họ tên], right: [chức danh, họ tên] } — phần ký cuối văn bản
+  function styledSheet({ title, meta = [], sections = [], letterhead = null, sign = null }) {
     const C = { accent: '0F6B62', soft: 'E2F0EE', ink: '15201F', muted: '5D6B69', line: 'C9D3D1', zebra: 'F6F9F8', red: 'B2402B', green: '1D7A3E' };
     const FONT = 'Arial';
     const border = { top: { style: 'thin', color: { rgb: C.line } }, bottom: { style: 'thin', color: { rgb: C.line } }, left: { style: 'thin', color: { rgb: C.line } }, right: { style: 'thin', color: { rgb: C.line } } };
     const aoa = [], kinds = [], heights = [];
     const spans = []; // số cột của bảng chứa dòng này
     const push = (row, kind, hpt, span = 0) => { aoa.push(row); kinds.push(kind); heights.push(hpt); spans.push(span); };
+    const tw = Math.max(2, ...sections.map(s => s.table[0].length));
+    const split = Math.max(1, Math.floor(tw * 0.4)); // cột bắt đầu nửa phải
+    const lr = (l, r) => { const row = Array(tw).fill(''); row[0] = l ?? ''; row[split] = r ?? ''; return row; };
+    if (letterhead) {
+      push(lr(letterhead.left[0], letterhead.right[0]), 'lh1', 20);
+      push(lr(letterhead.left[1], letterhead.right[1]), 'lh2', 20);
+      push([], 'blank', 14);
+    }
     push([title], 'title', 30);
     meta.forEach(m => push(m, 'meta', 18));
     sections.forEach(s => {
@@ -744,7 +776,15 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
       if (body.length) body.forEach((r, i) => push(r, i % 2 ? 'zebra' : 'body', 0, n));
       else push([s.empty || 'Không có dữ liệu'], 'empty', 22, n);
     });
-    const width = Math.max(2, ...aoa.filter((_, i) => ['head', 'body', 'zebra'].includes(kinds[i])).map(r => r.length));
+    if (sign) {
+      push([], 'blank', 18);
+      push(lr('', sign.date), 'sdate', 20);
+      push(lr(sign.left[0], sign.right[0]), 'srole', 20);
+      for (let i = 0; i < 4; i++) push([], 'blank', 18);
+      push(lr(sign.left[1], sign.right[1]), 'sname', 20);
+    }
+    const width = Math.max(tw, ...aoa.filter((_, i) => ['head', 'body', 'zebra'].includes(kinds[i])).map(r => r.length));
+    const DOC = ['lh1', 'lh2', 'sdate', 'srole', 'sname'];
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     const merges = [];
@@ -755,6 +795,19 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
       if (k === 'head') head = aoa[r].map(h => String(h ?? ''));
       if (k === 'blank') continue;
       if (['title', 'section'].includes(k)) merges.push({ s: { r, c: 0 }, e: { r, c: width - 1 } });
+      if (DOC.includes(k)) { // tiêu ngữ và phần ký: 2 khối căn giữa, font Times New Roman, không viền
+        if (split > 1) merges.push({ s: { r, c: 0 }, e: { r, c: split - 1 } });
+        if (width - split > 1) merges.push({ s: { r, c: split }, e: { r, c: width - 1 } });
+        for (let c = 0; c < width; c++) {
+          const ref = XLSX.utils.encode_cell({ r, c });
+          const cell = ws[ref] || (ws[ref] = { t: 's', v: '' });
+          const right = c >= split;
+          cell.s = { font: { name: 'Times New Roman', sz: 12, color: { rgb: '000000' },
+              bold: k !== 'sdate' && !(k === 'lh1' && !right), italic: k === 'sdate', underline: k === 'lh2' },
+            alignment: { horizontal: 'center', vertical: 'center' } };
+        }
+        continue;
+      }
       if (k === 'empty' && spans[r] > 1) merges.push({ s: { r, c: 0 }, e: { r, c: spans[r] - 1 } });
       const span = k === 'meta' ? 2 : k === 'title' ? 1 : k === 'section' ? width : spans[r];
       for (let c = 0; c < span; c++) {
@@ -762,7 +815,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
         const cell = ws[ref] || (ws[ref] = { t: 's', v: '' });
         const v = cell.v, sv = String(v ?? '');
         let s;
-        if (k === 'title') s = { font: { name: FONT, sz: 16, bold: true, color: { rgb: C.accent } }, alignment: { vertical: 'center' } };
+        if (k === 'title') s = { font: { name: FONT, sz: 16, bold: true, color: { rgb: C.accent } }, alignment: letterhead ? { vertical: 'center', horizontal: 'center' } : { vertical: 'center' } };
         else if (k === 'meta') s = c === 0
           ? { font: { name: FONT, sz: 10, bold: true, color: { rgb: C.muted } }, alignment: { vertical: 'center' } }
           : { font: { name: FONT, sz: 10, bold: true, color: { rgb: C.ink } }, alignment: { horizontal: 'left', vertical: 'center' } };
@@ -810,6 +863,25 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
 
   let downloadsApi;
   (async () => { try { downloadsApi = await window.claude?.use?.('downloads'); } catch { downloadsApi = null; } })();
+
+  // ---------- Thông tin ký (nhớ lại cho lần sau trên trình duyệt này) ----------
+  const SIGN_DEF = { maker: 'Nguyễn Thị Hiên', boss: 'Phạm Thị Dung', place: 'Hà Nội' };
+  const signStore = { get() { try { return JSON.parse(localStorage.getItem('nsdnu-sign') || '{}'); } catch { return {}; } },
+    set(v) { try { localStorage.setItem('nsdnu-sign', JSON.stringify(v)); } catch {} } };
+  (() => {
+    const v = { ...SIGN_DEF, ...signStore.get() };
+    $('signMaker').value = v.maker; $('signBoss').value = v.boss; $('signPlace').value = v.place;
+    const t = new Date(); $('signDate').value = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+    ['signMaker', 'signBoss', 'signPlace'].forEach(id => $(id).addEventListener('change', () =>
+      signStore.set({ maker: $('signMaker').value.trim(), boss: $('signBoss').value.trim(), place: $('signPlace').value.trim() })));
+  })();
+  function signInfo() {
+    const m = $('signDate').value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const place = $('signPlace').value.trim();
+    const day = m ? `ngày ${m[3]} tháng ${m[2]} năm ${m[1]}` : 'ngày ..... tháng ..... năm .....';
+    return { date: place ? `${place}, ${day}` : day.charAt(0).toUpperCase() + day.slice(1),
+      left: ['NGƯỜI LẬP', $('signMaker').value.trim()], right: ['LÃNH ĐẠO ĐƠN VỊ', $('signBoss').value.trim()] };
+  }
 
   async function exportExcel() {
     const scope = $('exportScope').value === 'all' ? '*' : state.month;
@@ -865,8 +937,18 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
         const e = XLSX.CFB.find(z, `/xl/worksheets/sheet${i + 1}.xml`);
         if (!e) return;
         const pane = v.freeze ? `<pane ySplit="${v.freeze}" topLeftCell="A${v.freeze + 1}" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A${v.freeze + 1}" sqref="A${v.freeze + 1}"/>` : '';
-        const xml = new TextDecoder().decode(e.content)
+        let xml = new TextDecoder().decode(e.content)
           .replace('<sheetView workbookViewId="0"/>', `<sheetView showGridLines="0" workbookViewId="0">${pane}</sheetView>`);
+        // In: A4 ngang, co vừa 1 trang theo chiều ngang (thư viện không tự ghi phần cài đặt trang)
+        if (wb.Sheets[name]['!printFit']) {
+          xml = xml.replace(/<sheetPr\/>|<sheetPr>[\s\S]*?<\/sheetPr>/, '')
+            .replace(/(<worksheet[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>')
+            .replace(/<pageMargins[^>]*\/>/, '');
+          const page = '<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>'
+            + '<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>';
+          const after = xml.match(/<(headerFooter|rowBreaks|colBreaks|customProperties|cellWatches|ignoredErrors|smartTags|drawing|legacyDrawing|picture|oleObjects|controls|webPublishItems|tableParts|extLst)\b/);
+          xml = after ? xml.replace(after[0], page + after[0]) : xml.replace('</worksheet>', page + '</worksheet>');
+        }
         e.content = new TextEncoder().encode(xml); e.size = e.content.length; touched = true;
       });
       return touched ? XLSX.CFB.write(z, { fileType: 'zip', type: 'array' }) : buf;
