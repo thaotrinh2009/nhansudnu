@@ -4,10 +4,11 @@ Trang web đọc 3 file Excel xuất từ hệ thống nhân sự và trả ra, 
 
 1. Nhân sự ký hợp đồng trong tháng (loại HĐ, ngày bắt đầu/kết thúc, lương theo HĐ nếu có)
 2. Nhân sự tăng lương (lương cũ → lương mới, chênh lệch)
-3. Nhân sự được bổ nhiệm (QĐ chính thức, thử việc, bổ nhiệm, kiêm nhiệm)
-4. Nhân sự nghỉ việc (tháng M gồm cả người nghỉ vào ngày cuối của tháng M-1, VD tháng 10 có cả người nghỉ ngày 30/09)
+3. Nhân sự giảm lương: QĐ “Giảm lương”, và QĐ “Tăng lương” / “Điều chỉnh lương” có lương mới thấp hơn lương cũ
+4. Nhân sự được bổ nhiệm (QĐ chính thức, thử việc, bổ nhiệm, kiêm nhiệm)
+5. Nhân sự nghỉ việc (tháng M gồm cả người nghỉ vào ngày cuối của tháng M-1, VD tháng 10 có cả người nghỉ ngày 30/09)
 
-Lương cũ khi tăng lương = quyết định nhân sự gần nhất trước ngày hiệu lực có ghi lương (bỏ QĐ không ghi lương, QĐ bị từ chối/huỷ); nếu không có thì lấy lương hợp đồng gần nhất.
+Lương cũ khi tăng/giảm lương = quyết định nhân sự gần nhất trước ngày hiệu lực có ghi lương (bỏ QĐ không ghi lương, QĐ bị từ chối/huỷ); nếu không có thì lấy lương hợp đồng gần nhất.
 
 ## File đầu vào
 
@@ -19,7 +20,7 @@ Lương cũ khi tăng lương = quyết định nhân sự gần nhất trước
 
 File chỉ được đọc trong trình duyệt, không gửi lên máy chủ nào.
 
-Xuất Excel ra **1 sheet** “Biến động nhân sự”: bảng tổng hợp ở trên, sau đó 4 bảng (Ký hợp đồng, Tăng lương, Bổ nhiệm, Nghỉ việc) xếp lần lượt.
+Xuất Excel ra **1 sheet** “Biến động nhân sự”: bảng tổng hợp ở trên, sau đó 5 bảng (Ký hợp đồng, Tăng lương, Giảm lương, Bổ nhiệm, Nghỉ việc) xếp lần lượt.
 
 ## Tab Đi muộn - về sớm - quên chấm công
 

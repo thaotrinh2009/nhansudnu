@@ -160,7 +160,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   <header style="display:flex;gap:12px;justify-content:space-between;align-items:start;flex-wrap:wrap">
     <div style="min-width:0;flex:1">
     <h1 id="appTitle">Biến động nhân sự theo tháng</h1>
-    <p class="sub" id="appSub">Tải lên 3 file xuất từ hệ thống (Hợp đồng, Quyết định thôi việc, Sự nghiệp), chọn tháng để xem ai ký hợp đồng, tăng lương, được bổ nhiệm và nghỉ việc. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.</p>
+    <p class="sub" id="appSub">Tải lên 3 file xuất từ hệ thống (Hợp đồng, Quyết định thôi việc, Sự nghiệp), chọn tháng để xem ai ký hợp đồng, tăng lương, giảm lương, được bổ nhiệm và nghỉ việc. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.</p>
     </div>
     <button class="btn ghost" id="lockBtn" type="button">Khoá ứng dụng</button>
   </header>
@@ -215,6 +215,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" id="tab-contract" data-tab="contract" aria-selected="true">Ký hợp đồng <span class="count" id="c-contract">0</span></button>
       <button class="tab" role="tab" id="tab-raise" data-tab="raise" aria-selected="false">Tăng lương <span class="count" id="c-raise">0</span></button>
+      <button class="tab" role="tab" id="tab-cut" data-tab="cut" aria-selected="false">Giảm lương <span class="count" id="c-cut">0</span></button>
       <button class="tab" role="tab" id="tab-appoint" data-tab="appoint" aria-selected="false">Bổ nhiệm <span class="count" id="c-appoint">0</span></button>
       <button class="tab" role="tab" id="tab-leave" data-tab="leave" aria-selected="false">Nghỉ việc <span class="count" id="c-leave">0</span></button>
     </div>
@@ -230,7 +231,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   <section id="welcome" class="table-box">
     <div class="empty">
       <strong>Chưa có dữ liệu</strong>
-      Sau khi tải file, trang sẽ hiện 4 bảng: hợp đồng ký trong tháng (ngày ký, loại HĐ, thời hạn, lương), tăng lương (lương cũ → mới), bổ nhiệm và nghỉ việc.
+      Sau khi tải file, trang sẽ hiện 5 bảng: hợp đồng ký trong tháng (ngày ký, loại HĐ, thời hạn, lương), tăng lương và giảm lương (lương cũ → mới), bổ nhiệm và nghỉ việc.
     </div>
   </section>
   </div>
@@ -540,7 +541,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
       const k = pkey(c); if (!contractsBy.has(k)) contractsBy.set(k, []);
       contractsBy.get(k).push(c);
     }
-    const out = { contract: [], raise: [], appoint: [], leave: [] };
+    const out = { contract: [], raise: [], cut: [], appoint: [], leave: [] };
 
     if (state.contract) {
       out.contract = state.contract.rows
@@ -549,7 +550,9 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
         .sort((a, b) => dKey(a.sign || a.start) - dKey(b.sign || b.start) || a.name.localeCompare(b.name, 'vi'));
     }
     if (state.career) {
-      out.raise = state.career.filter(r => r.type === 'Tăng lương' && inM(r.date)).map(r => {
+      // QĐ thay đổi lương: Tăng lương / Giảm lương / Điều chỉnh lương
+      const salaryKind = (t) => { const f = fold(t); return f.includes('giam luong') ? 'cut' : f.includes('tang luong') ? 'raise' : f.includes('dieu chinh luong') ? 'adjust' : ''; };
+      const changes = state.career.filter(r => salaryKind(r.type) && inM(r.date)).map(r => {
         // Lương cũ = quyết định nhân sự gần nhất TRƯỚC ngày hiệu lực lần tăng lương này mà có ghi lương
         // (bỏ QĐ không ghi lương như bổ nhiệm/kiêm nhiệm, QĐ bị từ chối/huỷ)
         const hist = by.get(pkey(r)) || [];
@@ -562,6 +565,13 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
         }
         return { ...r, prev };
       }).sort((a, b) => dKey(a.date) - dKey(b.date) || a.name.localeCompare(b.name, 'vi'));
+      // Có đủ lương cũ và mới thì xếp theo chênh lệch thực tế; thiếu thì theo tên loại quyết định
+      const side = (r) => {
+        if (r.salary != null && r.prev?.salary != null && r.salary !== r.prev.salary) return r.salary < r.prev.salary ? 'cut' : 'raise';
+        return salaryKind(r.type) === 'cut' ? 'cut' : 'raise';
+      };
+      out.raise = changes.filter(r => side(r) === 'raise');
+      out.cut = changes.filter(r => side(r) === 'cut');
       out.appoint = state.career.filter(r => r.type === 'Bổ nhiệm' && inM(r.date))
         .sort((a, b) => dKey(a.date) - dKey(b.date) || a.name.localeCompare(b.name, 'vi'));
     }
@@ -603,6 +613,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
       ['Nhân sự', who, r => `${r.name}\t${r.id}`, '', 'Tên nhân sự\tMã nhân sự'],
       ['Chức danh / Đơn vị', unitCell, r => `${r.title}\t${r.unit}`, '', 'Chức danh\tĐơn vị'],
       ['Hiệu lực', r => fmtD(r.date), r => fmtD(r.date), 'date'],
+      ['Loại QĐ', r => `<span class="pill">${esc(r.type)}</span>`, r => r.type],
       ['Lương cũ', r => r.prev ? `${fmtM(r.prev.salary)}<br><span class="dim" style="font-size:12px">${r.prev.src === 'hd' ? 'theo HĐ' : 'QĐ'} ${fmtD(r.prev.date)}${r.prev.src === 'qd' && r.prev.type ? ' · ' + esc(r.prev.type) : ''}</span>` : '<span class="dim">Chưa có QĐ / HĐ trước</span>', r => r.prev?.salary ?? '', 'num'],
       ['Lương mới', r => `<strong>${fmtM(r.salary)}</strong>`, r => r.salary ?? '', 'num'],
       ['Chênh lệch', r => diff(r.salary, r.prev?.salary), r => (r.salary != null && r.prev?.salary != null) ? r.salary - r.prev.salary : '', 'num'],
@@ -610,6 +621,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
       ['Phụ cấp cũ → mới', r => `${r.prev ? (fmtM(sumAllow(r.prev)) || '0') : '—'} → ${fmtM(sumAllow(r)) || '0'}`, r => `${r.prev ? (sumAllow(r.prev) ?? 0) : ''}\t${sumAllow(r) ?? 0}`, 'num', 'Phụ cấp cũ\tPhụ cấp mới'],
       ['Ghi chú', r => esc(r.reason), r => r.reason],
     ],
+    get cut() { return this.raise; },
     appoint: () => [
       ['Nhân sự', who, r => `${r.name}\t${r.id}`, '', 'Tên nhân sự\tMã nhân sự'],
       ['Chức danh / Đơn vị', unitCell, r => `${r.title}\t${r.unit}`, '', 'Chức danh\tĐơn vị'],
@@ -630,7 +642,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
       ['Ghi chú', r => esc(r.note), r => r.note],
     ],
   };
-  const SRC = { contract: 'contract', raise: 'career', appoint: 'career', leave: 'leave' };
+  const SRC = { contract: 'contract', raise: 'career', cut: 'career', appoint: 'career', leave: 'leave' };
   const SRCNAME = { contract: 'Hợp đồng', career: 'Sự nghiệp', leave: 'Quyết định thôi việc' };
 
   let current = [];
@@ -659,7 +671,8 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     const notes = [];
     if (!state[SRC[state.tab]]) notes.push(`Chưa tải file ${SRCNAME[SRC[state.tab]]}, nên bảng này đang trống.`);
     if (state.tab === 'contract' && state.contract && !state.contract.hasSign) notes.push('File hợp đồng hiện không có cột “Ngày ký”, nên danh sách được lọc theo Ngày bắt đầu hợp đồng. Nếu bổ sung cột Ngày ký vào file xuất, trang sẽ tự lọc theo ngày ký.');
-    if (state.tab === 'raise' && state.career) notes.push('Lương cũ lấy từ quyết định nhân sự gần nhất trước ngày hiệu lực của lần tăng lương này có ghi lương (file Sự nghiệp). Nếu không có quyết định nào trước đó, lấy lương của hợp đồng gần nhất (file Hợp đồng).');
+    if ((state.tab === 'raise' || state.tab === 'cut') && state.career) notes.push('Lương cũ lấy từ quyết định nhân sự gần nhất trước ngày hiệu lực có ghi lương (file Sự nghiệp). Nếu không có quyết định nào trước đó, lấy lương của hợp đồng gần nhất (file Hợp đồng).');
+    if (state.tab === 'cut' && state.career) notes.push('Giảm lương gồm quyết định loại “Giảm lương”, và quyết định “Tăng lương” / “Điều chỉnh lương” có lương mới thấp hơn lương cũ.');
     if (state.tab === 'leave' && state.leave && state.month !== '*') notes.push('Danh sách nghỉ việc của tháng gồm cả người nghỉ vào ngày cuối của tháng trước (VD tháng 10 có cả người nghỉ ngày 30/09).');
     $('note').hidden = !notes.length; $('note').innerHTML = notes.map(esc).join('<br>');
 
@@ -684,11 +697,11 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     });
   }
   // ---------- Excel export: one sheet per report ----------
-  const SHEETS = [['contract', 'Ký hợp đồng'], ['raise', 'Tăng lương'], ['appoint', 'Bổ nhiệm'], ['leave', 'Nghỉ việc']];
+  const SHEETS = [['contract', 'Ký hợp đồng'], ['raise', 'Tăng lương'], ['cut', 'Giảm lương'], ['appoint', 'Bổ nhiệm'], ['leave', 'Nghỉ việc']];
   const toCell = (v) => (typeof v === 'string' && /^-?\d+$/.test(v) && v.length < 16) ? +v : v;
   const rowDate = (k, r) => k === 'contract' ? (r.sign || r.start) : r.date;
 
-  // Một sheet duy nhất: tổng hợp ở trên, sau đó 4 bảng xếp lần lượt từ trên xuống.
+  // Một sheet duy nhất: tổng hợp ở trên, sau đó 5 bảng xếp lần lượt từ trên xuống.
   function buildWorkbook(month) {
     const R = reports(month), all = month === '*';
     const sections = [{ title: 'TỔNG QUAN', table: [['Hạng mục', 'Số nhân sự'], ...SHEETS.map(([k, name]) => [name, R[k].length])] }];
@@ -890,7 +903,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   // ---------- modules: HR changes / attendance ----------
   let mod = 'hr';
   const MOD_TEXT = {
-    hr: ['Biến động nhân sự theo tháng', 'Tải lên 3 file xuất từ hệ thống (Hợp đồng, Quyết định thôi việc, Sự nghiệp), chọn tháng để xem ai ký hợp đồng, tăng lương, được bổ nhiệm và nghỉ việc. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.'],
+    hr: ['Biến động nhân sự theo tháng', 'Tải lên 3 file xuất từ hệ thống (Hợp đồng, Quyết định thôi việc, Sự nghiệp), chọn tháng để xem ai ký hợp đồng, tăng lương, giảm lương, được bổ nhiệm và nghỉ việc. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.'],
     att: ['Đi muộn - về sớm - quên chấm công', 'Tải lên file vân tay và file đơn từ (Exported Timeoff) để trang tự tính, hoặc tải file báo cáo đã xử lý (sheet “Dữ liệu gốc”), rồi xem số lượt đi muộn, về sớm, quên chấm công theo tháng, theo đơn vị và theo từng nhân sự. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.'],
   };
   function setModule(m) {
