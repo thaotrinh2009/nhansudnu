@@ -21,7 +21,7 @@ Lương cũ khi tăng/giảm lương = quyết định nhân sự gần nhất t
 File chỉ được đọc trong trình duyệt, không gửi lên máy chủ nào.
 
 Xuất Excel ra **1 sheet** “Biến động nhân sự”: bảng tổng hợp ở trên, sau đó 5 bảng (Ký hợp đồng, Tăng lương, Giảm lương, Bổ nhiệm, Nghỉ việc) xếp lần lượt.
-File có sẵn tiêu ngữ (Trường Đại học Đại Nam, Phòng Tổ chức nhân sự / Quốc hiệu) và phần ký (ngày tháng, Người lập, Lãnh đạo đơn vị). Tên người ký, nơi ký, ngày ký sửa ngay trên trang (trình duyệt nhớ tên cho lần sau). Cài sẵn in A4 ngang, vừa 1 trang theo chiều ngang.
+File có sẵn tiêu ngữ (Trường Đại học Đại Nam, Phòng Tổ chức nhân sự / Quốc hiệu) và phần ký (ngày tháng; Lãnh đạo đơn vị bên trái, Người lập bên phải), toàn bộ font Times New Roman. Tên người ký, nơi ký, ngày ký sửa ngay trên trang (trình duyệt nhớ tên cho lần sau). Cài sẵn in A4 ngang, vừa 1 trang theo chiều ngang.
 
 ## Tab Đi muộn - về sớm - quên chấm công
 

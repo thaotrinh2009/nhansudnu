@@ -752,7 +752,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   // sign: { date: 'Hà Nội, ngày …', left: [chức danh, họ tên], right: [chức danh, họ tên] } — phần ký cuối văn bản
   function styledSheet({ title, meta = [], sections = [], letterhead = null, sign = null }) {
     const C = { accent: '0F6B62', soft: 'E2F0EE', ink: '15201F', muted: '5D6B69', line: 'C9D3D1', zebra: 'F6F9F8', red: 'B2402B', green: '1D7A3E' };
-    const FONT = 'Arial';
+    const FONT = 'Times New Roman';
     const border = { top: { style: 'thin', color: { rgb: C.line } }, bottom: { style: 'thin', color: { rgb: C.line } }, left: { style: 'thin', color: { rgb: C.line } }, right: { style: 'thin', color: { rgb: C.line } } };
     const aoa = [], kinds = [], heights = [];
     const spans = []; // số cột của bảng chứa dòng này
@@ -880,7 +880,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     const place = $('signPlace').value.trim();
     const day = m ? `ngày ${m[3]} tháng ${m[2]} năm ${m[1]}` : 'ngày ..... tháng ..... năm .....';
     return { date: place ? `${place}, ${day}` : day.charAt(0).toUpperCase() + day.slice(1),
-      left: ['NGƯỜI LẬP', $('signMaker').value.trim()], right: ['LÃNH ĐẠO ĐƠN VỊ', $('signBoss').value.trim()] };
+      left: ['LÃNH ĐẠO ĐƠN VỊ', $('signBoss').value.trim()], right: ['NGƯỜI LẬP', $('signMaker').value.trim()] };
   }
 
   async function exportExcel() {
