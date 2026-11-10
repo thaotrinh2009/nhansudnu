@@ -167,7 +167,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
 
   <nav class="modules" role="tablist" aria-label="Chọn báo cáo">
     <button class="mod" role="tab" id="mod-btn-hr" data-mod="hr" aria-selected="true">Biến động nhân sự</button>
-    <button class="mod" role="tab" id="mod-btn-att" data-mod="att" aria-selected="false">Đi muộn – Về sớm</button>
+    <button class="mod" role="tab" id="mod-btn-att" data-mod="att" aria-selected="false">Đi muộn - về sớm - quên chấm công</button>
   </nav>
 
   <div id="mod-hr" style="display:grid;gap:20px">
@@ -319,6 +319,8 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   const fold = (s) => norm(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
 
   // Dates → {y,m,d} ; accepts Date, Excel serial, "dd/mm/yyyy", "yyyy-mm-dd"
+  // File được đọc KHÔNG bật cellDates: ở múi giờ Việt Nam, SheetJS tạo Date lệch ~30 giây về trước
+  // (30/09 00:00 → 29/09 23:59:30) làm mọi ngày bị lùi 1 ngày. Đọc số serial rồi tính theo UTC thì không lệch.
   function parseDate(v) {
     if (v == null || v === '') return null;
     if (v instanceof Date && !isNaN(v)) return { y: v.getFullYear(), m: v.getMonth() + 1, d: v.getDate() };
@@ -387,6 +389,8 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
         salary: c('Lương'), base: c('Lương cơ bản'), allowRole: c('Phụ cấp kiêm chức vụ'), allowOther: c('Phụ cấp khác'),
         reason: c('Lý do'), concurrent: c('Kiêm nhiệm'), status: c('Trạng thái nhân sự'), approve: c('Trạng thái phê duyệt')
       };
+      // "Lương" must not resolve to "Lương cơ bản"
+      K.salary = Object.keys(rows[0]).find(k => ['luong', 'muc luong', 'luong chinh'].includes(fold(k))) || K.salary;
       for (const r of rows) {
         const g = (k) => K[k] ? r[K[k]] : '';
         const rec = {
@@ -457,7 +461,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     const errs = [];
     for (const f of files) {
       try {
-        const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: true });
+        const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
         const kind = classify(wb);
         if (kind === 'career') state.career = loadCareer(wb);
         else if (kind === 'contract') state.contract = loadContract(wb);
@@ -503,41 +507,68 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   }
 
   // ---------- reports ----------
+  // Khoá nhân sự: mã (bỏ khoảng trắng, không phân biệt hoa thường); không có mã thì dùng tên
+  const pkey = (r) => fold(r.id).replace(/\s+/g, '') || ('ten:' + fold(r.name));
+  const rejected = (r) => /tu choi|huy|khong duyet/.test(fold(r.approve));
   function careerIndex() {
     const by = new Map();
     for (const r of state.career || []) {
-      if (!by.has(r.id)) by.set(r.id, []);
-      by.get(r.id).push(r);
+      const k = pkey(r);
+      if (!by.has(k)) by.set(k, []);
+      by.get(k).push(r);
     }
     for (const list of by.values()) list.sort((a, b) => dKey(a.date) - dKey(b.date));
     return by;
   }
-  const latestInfo = (by, id) => { const l = by.get(id); return l && l.length ? l[l.length - 1] : null; };
+  const latestInfo = (by, r) => { const l = by.get(pkey(r)); return l && l.length ? l[l.length - 1] : null; };
 
   // month: 'yyyy-mm' or '*' for every month
   function reports(month = state.month) {
     const by = careerIndex();
     const inM = (d) => month === '*' ? !!d : mKey(d) === month;
+    // Nghỉ việc: tháng M lấy cả ngày cuối của tháng M-1 (VD tháng 10 lấy thêm người nghỉ ngày 30/09)
+    const prevLast = (() => {
+      if (month === '*') return 0;
+      const [y, m] = month.split('-').map(Number);
+      const last = new Date(Date.UTC(y, m - 1, 0));
+      return dKey({ y: last.getUTCFullYear(), m: last.getUTCMonth() + 1, d: last.getUTCDate() });
+    })();
+    // Hợp đồng có lương theo nhân sự (dùng khi không có QĐ trước đó ghi lương)
+    const contractsBy = new Map();
+    for (const c of state.contract?.rows || []) {
+      if (c.salary == null) continue;
+      const k = pkey(c); if (!contractsBy.has(k)) contractsBy.set(k, []);
+      contractsBy.get(k).push(c);
+    }
     const out = { contract: [], raise: [], appoint: [], leave: [] };
 
     if (state.contract) {
       out.contract = state.contract.rows
         .filter(r => inM(state.contract.hasSign ? (r.sign || r.start) : r.start))
-        .map(r => { const i = latestInfo(by, r.id); return { ...r, title: r.title || i?.title || '', unit: r.unit || i?.unit || '' }; })
+        .map(r => { const i = latestInfo(by, r); return { ...r, title: r.title || i?.title || '', unit: r.unit || i?.unit || '' }; })
         .sort((a, b) => dKey(a.sign || a.start) - dKey(b.sign || b.start) || a.name.localeCompare(b.name, 'vi'));
     }
     if (state.career) {
       out.raise = state.career.filter(r => r.type === 'Tăng lương' && inM(r.date)).map(r => {
-        const hist = by.get(r.id) || [];
-        const prev = hist.filter(h => dKey(h.date) < dKey(r.date)).pop() || null;
+        // Lương cũ = quyết định nhân sự gần nhất TRƯỚC ngày hiệu lực lần tăng lương này mà có ghi lương
+        // (bỏ QĐ không ghi lương như bổ nhiệm/kiêm nhiệm, QĐ bị từ chối/huỷ)
+        const hist = by.get(pkey(r)) || [];
+        let prev = hist.filter(h => h !== r && h.date && dKey(h.date) < dKey(r.date) && h.salary != null && !rejected(h)).pop() || null;
+        if (prev) prev = { ...prev, src: 'qd' };
+        else {
+          const c = (contractsBy.get(pkey(r)) || []).filter(c => (c.start || c.sign) && dKey(c.start || c.sign) < dKey(r.date))
+            .sort((a, b) => dKey(a.start || a.sign) - dKey(b.start || b.sign)).pop();
+          if (c) prev = { salary: c.salary, base: c.base, allowRole: c.allowRole, allowOther: c.allowOther, date: c.start || c.sign, type: 'Hợp đồng ' + (c.code || ''), src: 'hd' };
+        }
         return { ...r, prev };
       }).sort((a, b) => dKey(a.date) - dKey(b.date) || a.name.localeCompare(b.name, 'vi'));
       out.appoint = state.career.filter(r => r.type === 'Bổ nhiệm' && inM(r.date))
         .sort((a, b) => dKey(a.date) - dKey(b.date) || a.name.localeCompare(b.name, 'vi'));
     }
     if (state.leave) {
-      out.leave = state.leave.filter(r => inM(r.date)).map(r => {
-        const i = latestInfo(by, r.id); return { ...r, title: i?.title || '', unit: r.unit || i?.unit || '' };
+      out.leave = state.leave.filter(r => inM(r.date) || (r.date && dKey(r.date) === prevLast)).map(r => {
+        const i = latestInfo(by, r);
+        return { ...r, title: i?.title || '', unit: r.unit || i?.unit || '', carry: !!prevLast && dKey(r.date) === prevLast };
       }).sort((a, b) => dKey(a.date) - dKey(b.date));
     }
     return out;
@@ -572,10 +603,10 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
       ['Nhân sự', who, r => `${r.name}\t${r.id}`, '', 'Tên nhân sự\tMã nhân sự'],
       ['Chức danh / Đơn vị', unitCell, r => `${r.title}\t${r.unit}`, '', 'Chức danh\tĐơn vị'],
       ['Hiệu lực', r => fmtD(r.date), r => fmtD(r.date), 'date'],
-      ['Lương cũ', r => r.prev ? `${fmtM(r.prev.salary)}<br><span class="dim" style="font-size:12px">từ ${fmtD(r.prev.date)}</span>` : '<span class="dim">Chưa có QĐ trước</span>', r => r.prev?.salary ?? '', 'num'],
+      ['Lương cũ', r => r.prev ? `${fmtM(r.prev.salary)}<br><span class="dim" style="font-size:12px">${r.prev.src === 'hd' ? 'theo HĐ' : 'QĐ'} ${fmtD(r.prev.date)}${r.prev.src === 'qd' && r.prev.type ? ' · ' + esc(r.prev.type) : ''}</span>` : '<span class="dim">Chưa có QĐ / HĐ trước</span>', r => r.prev?.salary ?? '', 'num'],
       ['Lương mới', r => `<strong>${fmtM(r.salary)}</strong>`, r => r.salary ?? '', 'num'],
       ['Chênh lệch', r => diff(r.salary, r.prev?.salary), r => (r.salary != null && r.prev?.salary != null) ? r.salary - r.prev.salary : '', 'num'],
-      ['Lương CB cũ → mới', r => `${r.prev ? fmtM(r.prev.base) : '—'} → ${fmtM(r.base)}`, r => `${r.prev?.base ?? ''}\t${r.base ?? ''}`, 'num', 'Lương CB cũ\tLương CB mới'],
+      ['Lương CB cũ → mới', r => `${r.prev ? (fmtM(r.prev.base) || '—') : '—'} → ${fmtM(r.base)}`, r => `${r.prev?.base ?? ''}\t${r.base ?? ''}`, 'num', 'Lương CB cũ\tLương CB mới'],
       ['Phụ cấp cũ → mới', r => `${r.prev ? (fmtM(sumAllow(r.prev)) || '0') : '—'} → ${fmtM(sumAllow(r)) || '0'}`, r => `${r.prev ? (sumAllow(r.prev) ?? 0) : ''}\t${sumAllow(r) ?? 0}`, 'num', 'Phụ cấp cũ\tPhụ cấp mới'],
       ['Ghi chú', r => esc(r.reason), r => r.reason],
     ],
@@ -591,7 +622,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     leave: () => [
       ['Nhân sự', who, r => `${r.name}\t${r.id}`, '', 'Tên nhân sự\tMã nhân sự'],
       ['Chức danh / Đơn vị', unitCell, r => `${r.title}\t${r.unit}`, '', 'Chức danh\tĐơn vị'],
-      ['Ngày nghỉ việc', r => fmtD(r.date), r => fmtD(r.date), 'date'],
+      ['Ngày nghỉ việc', r => fmtD(r.date) + (r.carry ? '<br><span class="dim" style="font-size:12px">ngày cuối tháng trước</span>' : ''), r => fmtD(r.date), 'date'],
       ['Mã QĐ', r => `<span class="mono">${esc(r.code)}</span>`, r => r.code],
       ['Chính sách', r => esc(r.policy) || '<span class="dim">—</span>', r => r.policy],
       ['Lý do', r => esc(r.reason), r => r.reason],
@@ -628,7 +659,8 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     const notes = [];
     if (!state[SRC[state.tab]]) notes.push(`Chưa tải file ${SRCNAME[SRC[state.tab]]}, nên bảng này đang trống.`);
     if (state.tab === 'contract' && state.contract && !state.contract.hasSign) notes.push('File hợp đồng hiện không có cột “Ngày ký”, nên danh sách được lọc theo Ngày bắt đầu hợp đồng. Nếu bổ sung cột Ngày ký vào file xuất, trang sẽ tự lọc theo ngày ký.');
-    if (state.tab === 'raise' && state.career) notes.push('Lương cũ lấy từ quyết định gần nhất trước ngày hiệu lực của lần tăng lương này (trong file Sự nghiệp).');
+    if (state.tab === 'raise' && state.career) notes.push('Lương cũ lấy từ quyết định nhân sự gần nhất trước ngày hiệu lực của lần tăng lương này có ghi lương (file Sự nghiệp). Nếu không có quyết định nào trước đó, lấy lương của hợp đồng gần nhất (file Hợp đồng).');
+    if (state.tab === 'leave' && state.leave && state.month !== '*') notes.push('Danh sách nghỉ việc của tháng gồm cả người nghỉ vào ngày cuối của tháng trước (VD tháng 10 có cả người nghỉ ngày 30/09).');
     $('note').hidden = !notes.length; $('note').innerHTML = notes.map(esc).join('<br>');
 
     const cols = COLS[state.tab]().filter(c => !(c[0] === 'Ngày ký' && !state.contract?.hasSign));
@@ -859,7 +891,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   let mod = 'hr';
   const MOD_TEXT = {
     hr: ['Biến động nhân sự theo tháng', 'Tải lên 3 file xuất từ hệ thống (Hợp đồng, Quyết định thôi việc, Sự nghiệp), chọn tháng để xem ai ký hợp đồng, tăng lương, được bổ nhiệm và nghỉ việc. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.'],
-    att: ['Chấm công: đi muộn, về sớm', 'Tải lên file vân tay và file đơn từ (Exported Timeoff) để trang tự tính, hoặc tải file báo cáo đã xử lý (sheet “Dữ liệu gốc”), rồi xem số lượt đi muộn, về sớm, quên chấm công theo tháng, theo đơn vị và theo từng nhân sự. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.'],
+    att: ['Đi muộn - về sớm - quên chấm công', 'Tải lên file vân tay và file đơn từ (Exported Timeoff) để trang tự tính, hoặc tải file báo cáo đã xử lý (sheet “Dữ liệu gốc”), rồi xem số lượt đi muộn, về sớm, quên chấm công theo tháng, theo đơn vị và theo từng nhân sự. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.'],
   };
   function setModule(m) {
     mod = m;
@@ -949,7 +981,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     try {
       for (const file of files) {
         current = file.name;
-        const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+        const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
         const report = findReport(wb);
         if (report) { loadReport(report, file.name); continue; }
         const raw = sniffRaw(wb);
