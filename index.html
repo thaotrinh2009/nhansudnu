@@ -160,14 +160,14 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   <header style="display:flex;gap:12px;justify-content:space-between;align-items:start;flex-wrap:wrap">
     <div style="min-width:0;flex:1">
     <h1 id="appTitle">Biến động nhân sự theo tháng</h1>
-    <p class="sub" id="appSub">Tải lên 3 file xuất từ hệ thống (Hợp đồng, Quyết định thôi việc, Sự nghiệp), chọn tháng để xem ai ký hợp đồng, tăng lương, được bổ nhiệm và nghỉ việc. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.</p>
+    <p class="sub" id="appSub">Tải lên 3 file xuất từ hệ thống (Hợp đồng, Quyết định thôi việc, Sự nghiệp), chọn tháng để xem ai ký hợp đồng, tăng lương, giảm lương, được bổ nhiệm và nghỉ việc. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.</p>
     </div>
     <button class="btn ghost" id="lockBtn" type="button">Khoá ứng dụng</button>
   </header>
 
   <nav class="modules" role="tablist" aria-label="Chọn báo cáo">
     <button class="mod" role="tab" id="mod-btn-hr" data-mod="hr" aria-selected="true">Biến động nhân sự</button>
-    <button class="mod" role="tab" id="mod-btn-att" data-mod="att" aria-selected="false">Đi muộn – Về sớm</button>
+    <button class="mod" role="tab" id="mod-btn-att" data-mod="att" aria-selected="false">Đi muộn - về sớm - quên chấm công</button>
   </nav>
 
   <div id="mod-hr" style="display:grid;gap:20px">
@@ -201,7 +201,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
         <input type="search" id="q" placeholder="Tên, mã nhân sự, đơn vị…">
       </div>
       <div class="field export">
-        <label class="label" for="exportScope">Xuất Excel (4 bảng, 1 sheet)</label>
+        <label class="label" for="exportScope">Xuất Excel (5 bảng, 1 sheet)</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <select id="exportScope">
             <option value="month">Tháng đang chọn</option>
@@ -211,10 +211,30 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
         </div>
       </div>
     </div>
+    <div class="bar">
+      <div class="field">
+        <label class="label" for="signMaker">Người lập</label>
+        <input type="text" id="signMaker">
+      </div>
+      <div class="field">
+        <label class="label" for="signBoss">Lãnh đạo đơn vị</label>
+        <input type="text" id="signBoss">
+      </div>
+      <div class="field">
+        <label class="label" for="signPlace">Nơi ký</label>
+        <input type="text" id="signPlace" style="width:110px">
+      </div>
+      <div class="field">
+        <label class="label" for="signDate">Ngày ký</label>
+        <input type="date" id="signDate">
+      </div>
+      <div class="dim" style="font-size:12px;padding-bottom:9px">Tên và ngày in vào phần ký cuối file Excel xuất.</div>
+    </div>
 
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" id="tab-contract" data-tab="contract" aria-selected="true">Ký hợp đồng <span class="count" id="c-contract">0</span></button>
       <button class="tab" role="tab" id="tab-raise" data-tab="raise" aria-selected="false">Tăng lương <span class="count" id="c-raise">0</span></button>
+      <button class="tab" role="tab" id="tab-cut" data-tab="cut" aria-selected="false">Giảm lương <span class="count" id="c-cut">0</span></button>
       <button class="tab" role="tab" id="tab-appoint" data-tab="appoint" aria-selected="false">Bổ nhiệm <span class="count" id="c-appoint">0</span></button>
       <button class="tab" role="tab" id="tab-leave" data-tab="leave" aria-selected="false">Nghỉ việc <span class="count" id="c-leave">0</span></button>
     </div>
@@ -230,7 +250,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   <section id="welcome" class="table-box">
     <div class="empty">
       <strong>Chưa có dữ liệu</strong>
-      Sau khi tải file, trang sẽ hiện 4 bảng: hợp đồng ký trong tháng (ngày ký, loại HĐ, thời hạn, lương), tăng lương (lương cũ → mới), bổ nhiệm và nghỉ việc.
+      Sau khi tải file, trang sẽ hiện 5 bảng: hợp đồng ký trong tháng (ngày ký, loại HĐ, thời hạn, lương), tăng lương và giảm lương (lương cũ → mới), bổ nhiệm và nghỉ việc.
     </div>
   </section>
   </div>
@@ -319,6 +339,8 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   const fold = (s) => norm(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
 
   // Dates → {y,m,d} ; accepts Date, Excel serial, "dd/mm/yyyy", "yyyy-mm-dd"
+  // File được đọc KHÔNG bật cellDates: ở múi giờ Việt Nam, SheetJS tạo Date lệch ~30 giây về trước
+  // (30/09 00:00 → 29/09 23:59:30) làm mọi ngày bị lùi 1 ngày. Đọc số serial rồi tính theo UTC thì không lệch.
   function parseDate(v) {
     if (v == null || v === '') return null;
     if (v instanceof Date && !isNaN(v)) return { y: v.getFullYear(), m: v.getMonth() + 1, d: v.getDate() };
@@ -387,6 +409,8 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
         salary: c('Lương'), base: c('Lương cơ bản'), allowRole: c('Phụ cấp kiêm chức vụ'), allowOther: c('Phụ cấp khác'),
         reason: c('Lý do'), concurrent: c('Kiêm nhiệm'), status: c('Trạng thái nhân sự'), approve: c('Trạng thái phê duyệt')
       };
+      // "Lương" must not resolve to "Lương cơ bản"
+      K.salary = Object.keys(rows[0]).find(k => ['luong', 'muc luong', 'luong chinh'].includes(fold(k))) || K.salary;
       for (const r of rows) {
         const g = (k) => K[k] ? r[K[k]] : '';
         const rec = {
@@ -457,7 +481,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     const errs = [];
     for (const f of files) {
       try {
-        const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: true });
+        const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
         const kind = classify(wb);
         if (kind === 'career') state.career = loadCareer(wb);
         else if (kind === 'contract') state.contract = loadContract(wb);
@@ -503,41 +527,77 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   }
 
   // ---------- reports ----------
+  // Khoá nhân sự: mã (bỏ khoảng trắng, không phân biệt hoa thường); không có mã thì dùng tên
+  const pkey = (r) => fold(r.id).replace(/\s+/g, '') || ('ten:' + fold(r.name));
+  const rejected = (r) => /tu choi|huy|khong duyet/.test(fold(r.approve));
   function careerIndex() {
     const by = new Map();
     for (const r of state.career || []) {
-      if (!by.has(r.id)) by.set(r.id, []);
-      by.get(r.id).push(r);
+      const k = pkey(r);
+      if (!by.has(k)) by.set(k, []);
+      by.get(k).push(r);
     }
     for (const list of by.values()) list.sort((a, b) => dKey(a.date) - dKey(b.date));
     return by;
   }
-  const latestInfo = (by, id) => { const l = by.get(id); return l && l.length ? l[l.length - 1] : null; };
+  const latestInfo = (by, r) => { const l = by.get(pkey(r)); return l && l.length ? l[l.length - 1] : null; };
 
   // month: 'yyyy-mm' or '*' for every month
   function reports(month = state.month) {
     const by = careerIndex();
     const inM = (d) => month === '*' ? !!d : mKey(d) === month;
-    const out = { contract: [], raise: [], appoint: [], leave: [] };
+    // Nghỉ việc: tháng M lấy cả ngày cuối của tháng M-1 (VD tháng 10 lấy thêm người nghỉ ngày 30/09)
+    const prevLast = (() => {
+      if (month === '*') return 0;
+      const [y, m] = month.split('-').map(Number);
+      const last = new Date(Date.UTC(y, m - 1, 0));
+      return dKey({ y: last.getUTCFullYear(), m: last.getUTCMonth() + 1, d: last.getUTCDate() });
+    })();
+    // Hợp đồng có lương theo nhân sự (dùng khi không có QĐ trước đó ghi lương)
+    const contractsBy = new Map();
+    for (const c of state.contract?.rows || []) {
+      if (c.salary == null) continue;
+      const k = pkey(c); if (!contractsBy.has(k)) contractsBy.set(k, []);
+      contractsBy.get(k).push(c);
+    }
+    const out = { contract: [], raise: [], cut: [], appoint: [], leave: [] };
 
     if (state.contract) {
       out.contract = state.contract.rows
         .filter(r => inM(state.contract.hasSign ? (r.sign || r.start) : r.start))
-        .map(r => { const i = latestInfo(by, r.id); return { ...r, title: r.title || i?.title || '', unit: r.unit || i?.unit || '' }; })
+        .map(r => { const i = latestInfo(by, r); return { ...r, title: r.title || i?.title || '', unit: r.unit || i?.unit || '' }; })
         .sort((a, b) => dKey(a.sign || a.start) - dKey(b.sign || b.start) || a.name.localeCompare(b.name, 'vi'));
     }
     if (state.career) {
-      out.raise = state.career.filter(r => r.type === 'Tăng lương' && inM(r.date)).map(r => {
-        const hist = by.get(r.id) || [];
-        const prev = hist.filter(h => dKey(h.date) < dKey(r.date)).pop() || null;
+      // QĐ thay đổi lương: Tăng lương / Giảm lương / Điều chỉnh lương
+      const salaryKind = (t) => { const f = fold(t); return f.includes('giam luong') ? 'cut' : f.includes('tang luong') ? 'raise' : f.includes('dieu chinh luong') ? 'adjust' : ''; };
+      const changes = state.career.filter(r => salaryKind(r.type) && inM(r.date)).map(r => {
+        // Lương cũ = quyết định nhân sự gần nhất TRƯỚC ngày hiệu lực lần tăng lương này mà có ghi lương
+        // (bỏ QĐ không ghi lương như bổ nhiệm/kiêm nhiệm, QĐ bị từ chối/huỷ)
+        const hist = by.get(pkey(r)) || [];
+        let prev = hist.filter(h => h !== r && h.date && dKey(h.date) < dKey(r.date) && h.salary != null && !rejected(h)).pop() || null;
+        if (prev) prev = { ...prev, src: 'qd' };
+        else {
+          const c = (contractsBy.get(pkey(r)) || []).filter(c => (c.start || c.sign) && dKey(c.start || c.sign) < dKey(r.date))
+            .sort((a, b) => dKey(a.start || a.sign) - dKey(b.start || b.sign)).pop();
+          if (c) prev = { salary: c.salary, base: c.base, allowRole: c.allowRole, allowOther: c.allowOther, date: c.start || c.sign, type: 'Hợp đồng ' + (c.code || ''), src: 'hd' };
+        }
         return { ...r, prev };
       }).sort((a, b) => dKey(a.date) - dKey(b.date) || a.name.localeCompare(b.name, 'vi'));
+      // Có đủ lương cũ và mới thì xếp theo chênh lệch thực tế; thiếu thì theo tên loại quyết định
+      const side = (r) => {
+        if (r.salary != null && r.prev?.salary != null && r.salary !== r.prev.salary) return r.salary < r.prev.salary ? 'cut' : 'raise';
+        return salaryKind(r.type) === 'cut' ? 'cut' : 'raise';
+      };
+      out.raise = changes.filter(r => side(r) === 'raise');
+      out.cut = changes.filter(r => side(r) === 'cut');
       out.appoint = state.career.filter(r => r.type === 'Bổ nhiệm' && inM(r.date))
         .sort((a, b) => dKey(a.date) - dKey(b.date) || a.name.localeCompare(b.name, 'vi'));
     }
     if (state.leave) {
-      out.leave = state.leave.filter(r => inM(r.date)).map(r => {
-        const i = latestInfo(by, r.id); return { ...r, title: i?.title || '', unit: r.unit || i?.unit || '' };
+      out.leave = state.leave.filter(r => inM(r.date) || (r.date && dKey(r.date) === prevLast)).map(r => {
+        const i = latestInfo(by, r);
+        return { ...r, title: i?.title || '', unit: r.unit || i?.unit || '', carry: !!prevLast && dKey(r.date) === prevLast };
       }).sort((a, b) => dKey(a.date) - dKey(b.date));
     }
     return out;
@@ -572,13 +632,15 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
       ['Nhân sự', who, r => `${r.name}\t${r.id}`, '', 'Tên nhân sự\tMã nhân sự'],
       ['Chức danh / Đơn vị', unitCell, r => `${r.title}\t${r.unit}`, '', 'Chức danh\tĐơn vị'],
       ['Hiệu lực', r => fmtD(r.date), r => fmtD(r.date), 'date'],
-      ['Lương cũ', r => r.prev ? `${fmtM(r.prev.salary)}<br><span class="dim" style="font-size:12px">từ ${fmtD(r.prev.date)}</span>` : '<span class="dim">Chưa có QĐ trước</span>', r => r.prev?.salary ?? '', 'num'],
+      ['Loại QĐ', r => `<span class="pill">${esc(r.type)}</span>`, r => r.type],
+      ['Lương cũ', r => r.prev ? `${fmtM(r.prev.salary)}<br><span class="dim" style="font-size:12px">${r.prev.src === 'hd' ? 'theo HĐ' : 'QĐ'} ${fmtD(r.prev.date)}${r.prev.src === 'qd' && r.prev.type ? ' · ' + esc(r.prev.type) : ''}</span>` : '<span class="dim">Chưa có QĐ / HĐ trước</span>', r => r.prev?.salary ?? '', 'num'],
       ['Lương mới', r => `<strong>${fmtM(r.salary)}</strong>`, r => r.salary ?? '', 'num'],
       ['Chênh lệch', r => diff(r.salary, r.prev?.salary), r => (r.salary != null && r.prev?.salary != null) ? r.salary - r.prev.salary : '', 'num'],
-      ['Lương CB cũ → mới', r => `${r.prev ? fmtM(r.prev.base) : '—'} → ${fmtM(r.base)}`, r => `${r.prev?.base ?? ''}\t${r.base ?? ''}`, 'num', 'Lương CB cũ\tLương CB mới'],
+      ['Lương CB cũ → mới', r => `${r.prev ? (fmtM(r.prev.base) || '—') : '—'} → ${fmtM(r.base)}`, r => `${r.prev?.base ?? ''}\t${r.base ?? ''}`, 'num', 'Lương CB cũ\tLương CB mới'],
       ['Phụ cấp cũ → mới', r => `${r.prev ? (fmtM(sumAllow(r.prev)) || '0') : '—'} → ${fmtM(sumAllow(r)) || '0'}`, r => `${r.prev ? (sumAllow(r.prev) ?? 0) : ''}\t${sumAllow(r) ?? 0}`, 'num', 'Phụ cấp cũ\tPhụ cấp mới'],
       ['Ghi chú', r => esc(r.reason), r => r.reason],
     ],
+    get cut() { return this.raise; },
     appoint: () => [
       ['Nhân sự', who, r => `${r.name}\t${r.id}`, '', 'Tên nhân sự\tMã nhân sự'],
       ['Chức danh / Đơn vị', unitCell, r => `${r.title}\t${r.unit}`, '', 'Chức danh\tĐơn vị'],
@@ -591,7 +653,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     leave: () => [
       ['Nhân sự', who, r => `${r.name}\t${r.id}`, '', 'Tên nhân sự\tMã nhân sự'],
       ['Chức danh / Đơn vị', unitCell, r => `${r.title}\t${r.unit}`, '', 'Chức danh\tĐơn vị'],
-      ['Ngày nghỉ việc', r => fmtD(r.date), r => fmtD(r.date), 'date'],
+      ['Ngày nghỉ việc', r => fmtD(r.date) + (r.carry ? '<br><span class="dim" style="font-size:12px">ngày cuối tháng trước</span>' : ''), r => fmtD(r.date), 'date'],
       ['Mã QĐ', r => `<span class="mono">${esc(r.code)}</span>`, r => r.code],
       ['Chính sách', r => esc(r.policy) || '<span class="dim">—</span>', r => r.policy],
       ['Lý do', r => esc(r.reason), r => r.reason],
@@ -599,7 +661,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
       ['Ghi chú', r => esc(r.note), r => r.note],
     ],
   };
-  const SRC = { contract: 'contract', raise: 'career', appoint: 'career', leave: 'leave' };
+  const SRC = { contract: 'contract', raise: 'career', cut: 'career', appoint: 'career', leave: 'leave' };
   const SRCNAME = { contract: 'Hợp đồng', career: 'Sự nghiệp', leave: 'Quyết định thôi việc' };
 
   let current = [];
@@ -628,7 +690,9 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     const notes = [];
     if (!state[SRC[state.tab]]) notes.push(`Chưa tải file ${SRCNAME[SRC[state.tab]]}, nên bảng này đang trống.`);
     if (state.tab === 'contract' && state.contract && !state.contract.hasSign) notes.push('File hợp đồng hiện không có cột “Ngày ký”, nên danh sách được lọc theo Ngày bắt đầu hợp đồng. Nếu bổ sung cột Ngày ký vào file xuất, trang sẽ tự lọc theo ngày ký.');
-    if (state.tab === 'raise' && state.career) notes.push('Lương cũ lấy từ quyết định gần nhất trước ngày hiệu lực của lần tăng lương này (trong file Sự nghiệp).');
+    if ((state.tab === 'raise' || state.tab === 'cut') && state.career) notes.push('Lương cũ lấy từ quyết định nhân sự gần nhất trước ngày hiệu lực có ghi lương (file Sự nghiệp). Nếu không có quyết định nào trước đó, lấy lương của hợp đồng gần nhất (file Hợp đồng).');
+    if (state.tab === 'cut' && state.career) notes.push('Giảm lương gồm quyết định loại “Giảm lương”, và quyết định “Tăng lương” / “Điều chỉnh lương” có lương mới thấp hơn lương cũ.');
+    if (state.tab === 'leave' && state.leave && state.month !== '*') notes.push('Danh sách nghỉ việc của tháng gồm cả người nghỉ vào ngày cuối của tháng trước (VD tháng 10 có cả người nghỉ ngày 30/09).');
     $('note').hidden = !notes.length; $('note').innerHTML = notes.map(esc).join('<br>');
 
     const cols = COLS[state.tab]().filter(c => !(c[0] === 'Ngày ký' && !state.contract?.hasSign));
@@ -652,11 +716,11 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     });
   }
   // ---------- Excel export: one sheet per report ----------
-  const SHEETS = [['contract', 'Ký hợp đồng'], ['raise', 'Tăng lương'], ['appoint', 'Bổ nhiệm'], ['leave', 'Nghỉ việc']];
+  const SHEETS = [['contract', 'Ký hợp đồng'], ['raise', 'Tăng lương'], ['cut', 'Giảm lương'], ['appoint', 'Bổ nhiệm'], ['leave', 'Nghỉ việc']];
   const toCell = (v) => (typeof v === 'string' && /^-?\d+$/.test(v) && v.length < 16) ? +v : v;
   const rowDate = (k, r) => k === 'contract' ? (r.sign || r.start) : r.date;
 
-  // Một sheet duy nhất: tổng hợp ở trên, sau đó 4 bảng xếp lần lượt từ trên xuống.
+  // Một sheet duy nhất: tổng hợp ở trên, sau đó 5 bảng xếp lần lượt từ trên xuống.
   function buildWorkbook(month) {
     const R = reports(month), all = month === '*';
     const sections = [{ title: 'TỔNG QUAN', table: [['Hạng mục', 'Số nhân sự'], ...SHEETS.map(([k, name]) => [name, R[k].length])] }];
@@ -670,9 +734,12 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     });
     const ws = styledSheet({
       title: 'BÁO CÁO BIẾN ĐỘNG NHÂN SỰ',
-      meta: [['Kỳ báo cáo', all ? 'Tất cả các tháng' : mLabel(month)], ['Ngày xuất', new Date().toLocaleDateString('vi-VN')]],
+      meta: [['Kỳ báo cáo', all ? 'Tất cả các tháng' : mLabel(month)]],
       sections,
+      letterhead: { left: ['TRƯỜNG ĐẠI HỌC ĐẠI NAM', 'PHÒNG TỔ CHỨC NHÂN SỰ'], right: ['CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', 'Độc lập - Tự do - Hạnh phúc'] },
+      sign: signInfo(),
     });
+    ws['!printFit'] = true;
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Biến động nhân sự');
     return wb;
@@ -681,13 +748,23 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   // ---------- Excel styling (xlsx-js-style): tiêu đề, khối thông tin, bảng có viền, header màu ----------
   // blocks: { title, meta: [[nhãn, giá trị]], sections: [{ title, table: [header, ...rows], empty }] }
   // Trả về worksheet đã định dạng. Nội dung ô giữ nguyên như bản cũ (chỉ thêm định dạng) để đọc lại được.
-  function styledSheet({ title, meta = [], sections = [] }) {
+  // letterhead: { left: [dòng 1, dòng 2], right: [dòng 1, dòng 2] } — tiêu ngữ đầu văn bản
+  // sign: { date: 'Hà Nội, ngày …', left: [chức danh, họ tên], right: [chức danh, họ tên] } — phần ký cuối văn bản
+  function styledSheet({ title, meta = [], sections = [], letterhead = null, sign = null }) {
     const C = { accent: '0F6B62', soft: 'E2F0EE', ink: '15201F', muted: '5D6B69', line: 'C9D3D1', zebra: 'F6F9F8', red: 'B2402B', green: '1D7A3E' };
-    const FONT = 'Arial';
+    const FONT = 'Times New Roman';
     const border = { top: { style: 'thin', color: { rgb: C.line } }, bottom: { style: 'thin', color: { rgb: C.line } }, left: { style: 'thin', color: { rgb: C.line } }, right: { style: 'thin', color: { rgb: C.line } } };
     const aoa = [], kinds = [], heights = [];
     const spans = []; // số cột của bảng chứa dòng này
     const push = (row, kind, hpt, span = 0) => { aoa.push(row); kinds.push(kind); heights.push(hpt); spans.push(span); };
+    const tw = Math.max(2, ...sections.map(s => s.table[0].length));
+    const split = Math.max(1, Math.floor(tw * 0.4)); // cột bắt đầu nửa phải
+    const lr = (l, r) => { const row = Array(tw).fill(''); row[0] = l ?? ''; row[split] = r ?? ''; return row; };
+    if (letterhead) {
+      push(lr(letterhead.left[0], letterhead.right[0]), 'lh1', 20);
+      push(lr(letterhead.left[1], letterhead.right[1]), 'lh2', 20);
+      push([], 'blank', 14);
+    }
     push([title], 'title', 30);
     meta.forEach(m => push(m, 'meta', 18));
     sections.forEach(s => {
@@ -699,7 +776,15 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
       if (body.length) body.forEach((r, i) => push(r, i % 2 ? 'zebra' : 'body', 0, n));
       else push([s.empty || 'Không có dữ liệu'], 'empty', 22, n);
     });
-    const width = Math.max(2, ...aoa.filter((_, i) => ['head', 'body', 'zebra'].includes(kinds[i])).map(r => r.length));
+    if (sign) {
+      push([], 'blank', 18);
+      push(lr('', sign.date), 'sdate', 20);
+      push(lr(sign.left[0], sign.right[0]), 'srole', 20);
+      for (let i = 0; i < 4; i++) push([], 'blank', 18);
+      push(lr(sign.left[1], sign.right[1]), 'sname', 20);
+    }
+    const width = Math.max(tw, ...aoa.filter((_, i) => ['head', 'body', 'zebra'].includes(kinds[i])).map(r => r.length));
+    const DOC = ['lh1', 'lh2', 'sdate', 'srole', 'sname'];
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     const merges = [];
@@ -710,6 +795,19 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
       if (k === 'head') head = aoa[r].map(h => String(h ?? ''));
       if (k === 'blank') continue;
       if (['title', 'section'].includes(k)) merges.push({ s: { r, c: 0 }, e: { r, c: width - 1 } });
+      if (DOC.includes(k)) { // tiêu ngữ và phần ký: 2 khối căn giữa, font Times New Roman, không viền
+        if (split > 1) merges.push({ s: { r, c: 0 }, e: { r, c: split - 1 } });
+        if (width - split > 1) merges.push({ s: { r, c: split }, e: { r, c: width - 1 } });
+        for (let c = 0; c < width; c++) {
+          const ref = XLSX.utils.encode_cell({ r, c });
+          const cell = ws[ref] || (ws[ref] = { t: 's', v: '' });
+          const right = c >= split;
+          cell.s = { font: { name: 'Times New Roman', sz: 12, color: { rgb: '000000' },
+              bold: k !== 'sdate' && !(k === 'lh1' && !right), italic: k === 'sdate', underline: k === 'lh2' },
+            alignment: { horizontal: 'center', vertical: 'center' } };
+        }
+        continue;
+      }
       if (k === 'empty' && spans[r] > 1) merges.push({ s: { r, c: 0 }, e: { r, c: spans[r] - 1 } });
       const span = k === 'meta' ? 2 : k === 'title' ? 1 : k === 'section' ? width : spans[r];
       for (let c = 0; c < span; c++) {
@@ -717,7 +815,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
         const cell = ws[ref] || (ws[ref] = { t: 's', v: '' });
         const v = cell.v, sv = String(v ?? '');
         let s;
-        if (k === 'title') s = { font: { name: FONT, sz: 16, bold: true, color: { rgb: C.accent } }, alignment: { vertical: 'center' } };
+        if (k === 'title') s = { font: { name: FONT, sz: 16, bold: true, color: { rgb: C.accent } }, alignment: letterhead ? { vertical: 'center', horizontal: 'center' } : { vertical: 'center' } };
         else if (k === 'meta') s = c === 0
           ? { font: { name: FONT, sz: 10, bold: true, color: { rgb: C.muted } }, alignment: { vertical: 'center' } }
           : { font: { name: FONT, sz: 10, bold: true, color: { rgb: C.ink } }, alignment: { horizontal: 'left', vertical: 'center' } };
@@ -765,6 +863,25 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
 
   let downloadsApi;
   (async () => { try { downloadsApi = await window.claude?.use?.('downloads'); } catch { downloadsApi = null; } })();
+
+  // ---------- Thông tin ký (nhớ lại cho lần sau trên trình duyệt này) ----------
+  const SIGN_DEF = { maker: 'Nguyễn Thị Hiên', boss: 'Phạm Thị Dung', place: 'Hà Nội' };
+  const signStore = { get() { try { return JSON.parse(localStorage.getItem('nsdnu-sign') || '{}'); } catch { return {}; } },
+    set(v) { try { localStorage.setItem('nsdnu-sign', JSON.stringify(v)); } catch {} } };
+  (() => {
+    const v = { ...SIGN_DEF, ...signStore.get() };
+    $('signMaker').value = v.maker; $('signBoss').value = v.boss; $('signPlace').value = v.place;
+    const t = new Date(); $('signDate').value = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+    ['signMaker', 'signBoss', 'signPlace'].forEach(id => $(id).addEventListener('change', () =>
+      signStore.set({ maker: $('signMaker').value.trim(), boss: $('signBoss').value.trim(), place: $('signPlace').value.trim() })));
+  })();
+  function signInfo() {
+    const m = $('signDate').value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const place = $('signPlace').value.trim();
+    const day = m ? `ngày ${m[3]} tháng ${m[2]} năm ${m[1]}` : 'ngày ..... tháng ..... năm .....';
+    return { date: place ? `${place}, ${day}` : day.charAt(0).toUpperCase() + day.slice(1),
+      left: ['LÃNH ĐẠO ĐƠN VỊ', $('signBoss').value.trim()], right: ['NGƯỜI LẬP', $('signMaker').value.trim()] };
+  }
 
   async function exportExcel() {
     const scope = $('exportScope').value === 'all' ? '*' : state.month;
@@ -820,8 +937,18 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
         const e = XLSX.CFB.find(z, `/xl/worksheets/sheet${i + 1}.xml`);
         if (!e) return;
         const pane = v.freeze ? `<pane ySplit="${v.freeze}" topLeftCell="A${v.freeze + 1}" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A${v.freeze + 1}" sqref="A${v.freeze + 1}"/>` : '';
-        const xml = new TextDecoder().decode(e.content)
+        let xml = new TextDecoder().decode(e.content)
           .replace('<sheetView workbookViewId="0"/>', `<sheetView showGridLines="0" workbookViewId="0">${pane}</sheetView>`);
+        // In: A4 ngang, co vừa 1 trang theo chiều ngang (thư viện không tự ghi phần cài đặt trang)
+        if (wb.Sheets[name]['!printFit']) {
+          xml = xml.replace(/<sheetPr\/>|<sheetPr>[\s\S]*?<\/sheetPr>/, '')
+            .replace(/(<worksheet[^>]*>)/, '$1<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>')
+            .replace(/<pageMargins[^>]*\/>/, '');
+          const page = '<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/>'
+            + '<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/>';
+          const after = xml.match(/<(headerFooter|rowBreaks|colBreaks|customProperties|cellWatches|ignoredErrors|smartTags|drawing|legacyDrawing|picture|oleObjects|controls|webPublishItems|tableParts|extLst)\b/);
+          xml = after ? xml.replace(after[0], page + after[0]) : xml.replace('</worksheet>', page + '</worksheet>');
+        }
         e.content = new TextEncoder().encode(xml); e.size = e.content.length; touched = true;
       });
       return touched ? XLSX.CFB.write(z, { fileType: 'zip', type: 'array' }) : buf;
@@ -858,8 +985,8 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
   // ---------- modules: HR changes / attendance ----------
   let mod = 'hr';
   const MOD_TEXT = {
-    hr: ['Biến động nhân sự theo tháng', 'Tải lên 3 file xuất từ hệ thống (Hợp đồng, Quyết định thôi việc, Sự nghiệp), chọn tháng để xem ai ký hợp đồng, tăng lương, được bổ nhiệm và nghỉ việc. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.'],
-    att: ['Chấm công: đi muộn, về sớm', 'Tải lên file vân tay và file đơn từ (Exported Timeoff) để trang tự tính, hoặc tải file báo cáo đã xử lý (sheet “Dữ liệu gốc”), rồi xem số lượt đi muộn, về sớm, quên chấm công theo tháng, theo đơn vị và theo từng nhân sự. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.'],
+    hr: ['Biến động nhân sự theo tháng', 'Tải lên 3 file xuất từ hệ thống (Hợp đồng, Quyết định thôi việc, Sự nghiệp), chọn tháng để xem ai ký hợp đồng, tăng lương, giảm lương, được bổ nhiệm và nghỉ việc. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.'],
+    att: ['Đi muộn - về sớm - quên chấm công', 'Tải lên file vân tay và file đơn từ (Exported Timeoff) để trang tự tính, hoặc tải file báo cáo đã xử lý (sheet “Dữ liệu gốc”), rồi xem số lượt đi muộn, về sớm, quên chấm công theo tháng, theo đơn vị và theo từng nhân sự. File chỉ được đọc trong trình duyệt của bạn, không gửi đi đâu.'],
   };
   function setModule(m) {
     mod = m;
@@ -949,7 +1076,7 @@ td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-sp
     try {
       for (const file of files) {
         current = file.name;
-        const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+        const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
         const report = findReport(wb);
         if (report) { loadReport(report, file.name); continue; }
         const raw = sniffRaw(wb);
